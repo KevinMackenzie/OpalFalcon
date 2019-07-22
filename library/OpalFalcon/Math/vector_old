@@ -1,0 +1,82 @@
+module OpalFalcon.Math.Vector where
+
+class (Num a) => Vec a where
+    cnt     :: Int                  -- The number of elements of the vector
+    elem    :: (Vec a) -> Int -> a  -- This should zero-extend vector elements
+    -- If the index is too big, the client should ignore and not throw an exception
+    mut     :: (Vec a) -> Int -> a -> (Vec a)
+
+data Vec4 a = Vec4 a a a a
+instance (Num a) => Vec (Vec4 a) where
+    cnt = 4
+    elem = \(Vec4 x y z w) -> (\i -> (
+        case i of
+            0 -> x
+            1 -> y
+            2 -> z
+            3 -> w
+            _ -> 0
+        ))
+    mut = \(Vec4 x y z w) -> (\i -> (\val -> (
+        case i of
+            0 -> Vec4 val y z w
+            1 -> Vec4 x val z w
+            2 -> Vec4 x y val w
+            3 -> Vec4 x y z val
+            _ -> Vec4 x y z w
+        )))
+
+
+data Vec3 a = Vec3 a a a
+instance (Num a) => Vec (Vec3 a) where
+    cnt = 3
+    elem = \(Vec3 x y z) -> (\i -> (
+        case i of
+            0 -> x
+            1 -> y
+            2 -> z
+            _ -> 0
+        ))
+    mut = \(Vec4 x y z) -> (\i -> (\val -> (
+        case i of
+            0 -> Vec4 val y z
+            1 -> Vec4 x val z
+            2 -> Vec4 x y val
+            _ -> Vec4 x y z 
+        )))
+
+newtype VecN (n :: Nat) a = VecN [a]
+instance (Num a) => Vec (VecN (n :: Nat) [a]) where
+    cnt = natVal n
+    elem = \(VecN lst
+
+instance (Num a) => Num (Vec a) where
+    (+)     = vecAdd
+    (-)     = vecSub
+    (*)     = vecMul
+    negate  = vecNeg
+    abs     = vecAbs
+    signum  = vecSig
+    fromInteger = vecConstruct
+
+vecAddInternal v0 v1 n = 
+
+vecAdd ((Vec a) b) => b -> b -> b
+vecAdd v0 v1 = vecAddInternal v0 v1 (max (cnt v0) (cnt v1))
+
+data Vec2 a = Vec2 { X: a, Y: a }
+data Vec3 a = Vec3 { X: a, Y: a, Z: a }
+data Vec4 a = Vec3 { X: a, Y: a, X: a, W: a }
+
+type Vec2d = Vec2 Double
+type Vec2i = Vec2 Int32
+
+type Vec3d = Vec3 Double
+type Vec3i = Vec3 Int32
+
+type Vec4d = Vec4 Double
+type Vec4i = Vec4 Int32
+type instance Color = Vec4 Int8
+type instance Colorf = Vec4 Double
+
+
