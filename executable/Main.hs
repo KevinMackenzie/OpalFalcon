@@ -49,7 +49,7 @@ printHits hs = foldl (++) "\n" $ map (\x -> case x of Nothing -> ""
 saveToPng :: String -> [ColorRGBf] -> Int -> Int -> IO ()
 saveToPng p l w h = 
     let pixs = V.fromList $ map (((\(V3 x y z) -> PixelRGB8 x y z) . toPixel) :: (ColorRGBf -> PixelRGB8)) l
-        bs = encodePng $ generateImage (\x y -> pixs V.! (x+y*w)) w h
+        bs = encodePng $ generateImage (\x y -> pixs V.! (y+(w-1-x)*h)) w h
     in do Bs.writeFile p bs
 
 main :: IO ()
