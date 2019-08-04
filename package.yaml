@@ -25,6 +25,8 @@ library:
   - base
   - semigroupoids
   - bytestring
+  - vector
+  - bytestring
   - JuicyPixels
   source-dirs: library
 
@@ -35,9 +37,6 @@ executables:
     dependencies:
     - base
     - OpalFalcon
-    - vector
-    - bytestring
-    - JuicyPixels
     ghc-options:
     - -rtsopts
     - -threaded
