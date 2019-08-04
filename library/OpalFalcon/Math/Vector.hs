@@ -14,12 +14,10 @@ class (Foldable a, Apply a) => Vector a where
 (|+|) :: (Vector a, Num b) => a b -> a b -> a b
 (|-|) :: (Vector a, Num b) => a b -> a b -> a b
 (|*|) :: (Vector a, Num b) => a b -> a b -> a b
-negVec :: (Vector a, Num b) => a b -> a b
 
 (|+|) = liftF2 (+)
 (|-|) = liftF2 (-)
 (|*|) = liftF2 (*)
-negVec = fmap negate 
 
 -- Higher-order types
 data Vec2 a = V2 a a
@@ -70,12 +68,12 @@ whitef = constVec 1.0
 
 -- Multiply by scalar
 (*|) :: (Vector a, Num b) => b -> a b -> a b
-(*|) s = fmap ((*) s)
+(*|) s = fmap (s*)
 (|*) :: (Vector a, Num b) => a b -> b -> a b
 (|*) v s = s *| v
 -- Dot product
 (|.|) :: (Vector a, Num b) => a b -> a b -> b
-(|.|) v0 v1 = foldr (+) 0 $ liftF2 (*) v0 v1
+(|.|) v0 v1 = foldr (+) 0 $ v0 |*| v1
 -- Negate
 negateVec :: (Vector a, Num b) => a b -> a b
 negateVec = fmap negate
@@ -103,6 +101,8 @@ toHomoPos v = toHomo v 1
 toHomoDir :: (Num a) => Vec3 a -> Vec4 a
 toHomoDir v = toHomo v 0
 
+-- Reflection assumes 'norm' is normalized
+--  Note: 'v' is centered at the origin; 'incoming' vectors must be flipped
 reflect :: (Floating a) => Vec3 a -> Vec3 a -> Vec3 a
-reflect v norm = v |-| ((2 * (v |.| norm)) *| norm)
+reflect v norm = ((2 * (v |.| norm)) *| norm) |-| v
 

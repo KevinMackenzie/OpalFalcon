@@ -32,6 +32,7 @@ data RtRay = MkRtR { rayBase :: Ray
                    -- , prevHit :: Hit
                    -- We could also bundle an RNG here for MC RT
                    }
+    deriving (Show)
 -- We can take advantage of lazy evaluation so not all of these will evaluated every time
 data Hit = MkHit { hitPos :: Vec3d
                  , hitNorm :: Vec3d
@@ -41,6 +42,9 @@ data Hit = MkHit { hitPos :: Vec3d
                  , hitMat :: AppliedMaterial
                  }
 
+instance Show Hit where
+    show h = (foldl (\x -> (\y -> (++) x ((++) "\n    " y))) "Hit {" [(show $ hitPos h), (show $ hitNorm h), (show $ hitInc h), (show $ hitParam h), (show $ hitOut h), (show $ hitMat h)]) ++ "\n}\n"
+
 -- Object collects the minimum definition for an ray-tracable object
 data Object = MkObj { objPos :: Vec3d
                     , objIntersectRay :: Ray -> Maybe Hit
@@ -49,6 +53,8 @@ data Object = MkObj { objPos :: Vec3d
 data AppliedMaterial = MkAppMat { matDiffuseColor :: ColorRGBf
                                 , matApply :: ColorRGBf -> ColorRGBf
                                 }
+instance Show AppliedMaterial where
+    show m = show $ matDiffuseColor m
 
 -- Instances for Visible 
 instance Visible Object where
@@ -76,11 +82,16 @@ defaultRtRay base =
 -- We don't really want to define `Ord` over Hits
 closerHit :: Vec3d -> Maybe Hit -> Maybe Hit -> Maybe Hit
 closerHit p mh1 mh2 = 
-    case (mh1, mh2) of
+    let f x = mag $ (hitPos x) |-| p
+        c x y = (f x) < (f y)
+    in  maybeCompare c mh1 mh2
+
+-- Where should this go?
+maybeCompare :: (a -> a -> Bool) -> Maybe a -> Maybe a -> Maybe a
+maybeCompare f m0 m1 =
+    case (m0, m1) of
         (Nothing, Nothing) -> Nothing
         (Nothing, Just v) -> Just v
         (Just v, Nothing) -> Just v
-        (Just h1, Just h2) -> let f = \x -> mag $ (hitPos x) |-| p
-                  in if (f h1) < (f h2) then Just h1 else Just h2
-
+        (Just h0, Just h1) -> if f h0 h1 then Just h0 else Just h1
 
