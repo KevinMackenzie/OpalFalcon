@@ -8,18 +8,21 @@ import OpalFalcon.Images
 import OpalFalcon.Scene.ObjectCollections.ObjectList
 import OpalFalcon.Scene.Objects
 import OpalFalcon.Scene
+import OpalFalcon.Scene.Objects.Plane
 
 -- This is a test to see if we can get a simple rendering of a sphere
 -- TODO: we need a way to save the results to a file (do ppm for now)
 
 sph :: Object
 sph1 :: Object
+ground :: Object
 ol :: ObjectList
 sc :: Scene ObjectList
 
-sph = mkSphereObject (V3 (-2) 0 (-2)) 1
-sph1 = mkSphereObject (V3 6 0 3) 6
-ol = MkObjList { objList = [sph, sph1] }
+sph = mkSphereObject (V3 (-2) 2 (-2)) 1
+sph1 = mkSphereObject (V3 6 (-1) 3) 6
+ground = mkPlaneObject (MkRay (V3 0 (-2) 0) (V3 0 1 0))
+ol = MkObjList { objList = [sph, sph1, ground] }
 sc = (MkScene {objects=ol})
 
 printHits hs = foldl (++) "\n" $ map (\x -> case x of Nothing -> ""
@@ -35,6 +38,7 @@ main = let w = 500
            -- h0 = probeCollection ol $ rayBase r0
            -- r1 = fmap (deriveRay r0) h0
            -- h1 = fmap ((probeCollection ol) . rayBase) r1
+           hitPlane = hittestPlane (MkPlane (MkRay (V3 0 (-3) 0) (V3 0 1 0))) (MkRay origin $ normalize (V3 0 (-1) (-1)))
        in  do {
            -- writeFile "outfile.ppm" $ encodePpm pixs 100 100;
            saveToPng "pngfile.png" pixs w h;
@@ -44,6 +48,7 @@ main = let w = 500
            -- print $ closerPos (V3 0 0 0) (Just (V3 1 2 1)) (Just (V3 2 1 2));
            -- print $ hittestSphere (MkSphere (V3 0 0 (-1)) 2) (MkRay (V3 0 0 10) (V3 0 0 (-1)));
            -- print $ objIntersectRay sph (MkRay (V3 0 0 10) (V3 0 0 (-1)));
+           print $ hitPlane;
            }
 
 -- TODO: uhh, write some fucking tests.  That's how you debug FP

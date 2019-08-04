@@ -2,6 +2,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 module OpalFalcon.BaseTypes where
 
+import Data.Maybe
+
 import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Ray
 
@@ -29,7 +31,7 @@ class ObjectProvider a where
 data RtRay = MkRtR { rayBase :: Ray
                    , rayColor :: ColorRGBf
                    , rayDepth :: Integer
-                   -- , prevHit :: Hit
+                   , rayHit :: Maybe Hit
                    -- We could also bundle an RNG here for MC RT
                    }
     deriving (Show)
@@ -38,12 +40,11 @@ data Hit = MkHit { hitPos :: Vec3d
                  , hitNorm :: Vec3d
                  , hitInc :: Ray
                  , hitParam :: Double
-                 , hitOut :: Vec3d
                  , hitMat :: AppliedMaterial
                  }
 
 instance Show Hit where
-    show h = (foldl (\x -> (\y -> (++) x ((++) "\n    " y))) "Hit {" [(show $ hitPos h), (show $ hitNorm h), (show $ hitInc h), (show $ hitParam h), (show $ hitOut h), (show $ hitMat h)]) ++ "\n}\n"
+    show h = (foldl (\x -> (\y -> (++) x ((++) "\n    " y))) "Hit {" [(show $ hitPos h), (show $ hitNorm h), (show $ hitInc h), (show $ hitParam h),  (show $ hitMat h)]) ++ "\n}\n"
 
 -- Object collects the minimum definition for an ray-tracable object
 data Object = MkObj { objPos :: Vec3d
@@ -51,7 +52,7 @@ data Object = MkObj { objPos :: Vec3d
                     }
 
 data AppliedMaterial = MkAppMat { matDiffuseColor :: ColorRGBf
-                                , matApply :: ColorRGBf -> ColorRGBf
+                                , matApply :: Hit -> RtRay -> RtRay
                                 }
 instance Show AppliedMaterial where
     show m = show $ matDiffuseColor m
@@ -71,12 +72,16 @@ instance Locatable Hit where
     position = hitPos
 
 
+evaluateRayColor :: ColorRGBf -> RtRay -> ColorRGBf
+evaluateRayColor fallback ray = (rayColor ray) |*| (fromMaybe fallback ((matDiffuseColor . hitMat) <$> (rayHit ray)))
+
 -- Constructors et al
 defaultRtRay :: Ray -> RtRay
 defaultRtRay base = 
     MkRtR { rayBase = base
           , rayColor = whitef
           , rayDepth = 0
+          , rayHit = Nothing
           }
 
 -- We don't really want to define `Ord` over Hits

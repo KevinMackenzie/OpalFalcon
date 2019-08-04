@@ -11,21 +11,25 @@ import OpalFalcon.Math.Transformations
 epsilon :: Double
 epsilon = 0.00001
 
-shootRay :: (ObjectCollection o) => Scene o -> R.Ray -> ColorRGBf
-shootRay scene ray = traceRay scene (\r -> (rayDepth r) > 4) $ defaultRtRay ray
+breakRt bounces r = ((rayDepth r) > bounces) || origin == (R.dir $ rayBase r)
 
-deriveRay :: RtRay -> Hit -> RtRay
-deriveRay r h = MkRtR { rayBase = R.advanceRay (R.MkRay (hitPos h) (hitOut h)) epsilon
+shootRay :: (ObjectCollection o) => Scene o -> R.Ray -> ColorRGBf
+shootRay scene ray = traceRay scene (breakRt 2) $ defaultRtRay ray
+
+deriveRay :: Hit -> RtRay -> RtRay
+deriveRay h r= MkRtR { rayBase = R.advanceRay (rayBase r) epsilon
                       , rayColor = rayColor r 
                       , rayDepth = (rayDepth r) + 1
+                      , rayHit = Just h
                       }
 
+-- TODO: 'deriveRay' needs the reflected direction
 traceRay :: (ObjectCollection o) => Scene o -> (RtRay -> Bool) -> RtRay -> ColorRGBf
 traceRay scene br ray =
-    if br ray then (rayColor ray) else
-    case (probeCollection (objects scene) (rayBase ray)) of
-        Nothing -> rayColor ray
-        Just hit ->  matApply (hitMat hit) $ traceRay scene br $ deriveRay ray hit
+    if br ray then evaluateRayColor whitef ray
+    else case (probeCollection (objects scene) (rayBase ray)) of
+             Nothing -> (rayColor ray) |*| whitef
+             Just hit -> traceRay scene br $ deriveRay hit $ matApply (hitMat hit) hit ray
 
 
 genPixMap :: Integer -> Integer -> [(Integer, Integer)]

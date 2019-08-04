@@ -66,6 +66,9 @@ white = constVec 255
 whitef :: ColorRGBf
 whitef = constVec 1.0
 
+black :: (Num a) => Vec3 a
+black = constVec (fromInteger 0)
+
 -- Multiply by scalar
 (*|) :: (Vector a, Num b) => b -> a b -> a b
 (*|) s = fmap (s*)
