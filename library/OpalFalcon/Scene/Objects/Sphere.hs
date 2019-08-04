@@ -19,7 +19,6 @@ calcSphereHit (MkSphere sPos _) r p =
               , hitNorm = norm
               , hitInc = r
               , hitParam = p
-              , hitOut = reflectRay r norm
               -- For now
               , hitMat = mkSimpleMat (V3 0.0 0.0 0.0) (V3 0.8 0.1 0.1)
               }
