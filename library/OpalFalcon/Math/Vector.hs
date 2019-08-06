@@ -80,6 +80,9 @@ black = constVec (fromInteger 0)
 -- Negate
 negateVec :: (Vector a, Num b) => a b -> a b
 negateVec = fmap negate
+-- Distance function
+distance :: (Vector a, Floating b) => a b -> a b -> b
+distance v0 v1 = mag $ v0 |-| v1
 
 -- Magnitude
 mag :: (Vector a, Floating b) => a b -> b

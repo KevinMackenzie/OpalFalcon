@@ -22,7 +22,8 @@ sc :: Scene ObjectList
 sph = mkSphereObject (V3 (-2) 2 (-2)) 1
 sph1 = mkSphereObject (V3 6 (-1) 3) 6
 ground = mkPlaneObject (MkRay (V3 0 (-2) 0) (V3 0 1 0))
-ol = MkObjList { objList = [sph, sph1, ground] }
+disc = mkDiscObject (MkPlane (MkRay (V3 0 3 (-6)) (normalize (V3 0 (-1) 0.5)))) 2
+ol = MkObjList { objList = [sph, sph1, ground, disc] }
 sc = (MkScene {objects=ol})
 
 printHits hs = foldl (++) "\n" $ map (\x -> case x of Nothing -> ""
