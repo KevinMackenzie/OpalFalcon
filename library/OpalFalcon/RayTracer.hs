@@ -42,7 +42,7 @@ genRays w h (R.MkRay cPos cDir) fov =
         h2 = shiftR h 1
         d = (1 / (tan fov)) * (fromInteger h2)
         pxMap = genPixMap w2 h2
-        dirs = map (\(x,y) -> noHomo (normalize (
+        dirs = map (\(x,y) -> fromHomo (normalize (
                                 applyTransform (toHomoPos (normalize (V3 (fromInteger x) (fromInteger y) (-d)))) 
                                                (lookAt cDir)
                               ))) pxMap

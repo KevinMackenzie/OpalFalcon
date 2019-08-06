@@ -98,8 +98,8 @@ toPixel :: ColorRGBf -> ColorRGB
 toPixel = fmap (round . (255*))
 
 -- Functions for converting vectors to and from homogeneous coords
-noHomo :: (Floating a) => Vec4 a -> Vec3 a
-noHomo (V4 x y z w) = V3 (x/w) (y/w) (z/w)
+fromHomo :: (Floating a) => Vec4 a -> Vec3 a
+fromHomo (V4 x y z w) = V3 (x/w) (y/w) (z/w)
 toHomo :: (Num a) => Vec3 a -> a -> Vec4 a
 toHomo (V3 x y z) w = (V4 x y z w)
 toHomoPos :: (Num a) => Vec3 a -> Vec4 a
