@@ -19,6 +19,15 @@ class (Foldable a, Apply a) => Vector a where
 (|-|) = liftF2 (-)
 (|*|) = liftF2 (*)
 
+-- Approximately equal to with default epsilon
+(~=) :: (Vector a, Ord b, Floating b) => a b -> a b -> Bool
+(~=) = approxEq 0.00001
+
+-- Used to see if two vectors are approximately equal to 
+--  handle floating-point errors
+approxEq :: (Vector a, Ord b, Floating b) => b -> a b -> a b -> Bool
+approxEq e v0 v1 = foldr (&&) True $ liftF2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
+
 -- Higher-order types
 data Vec2 a = V2 a a
     deriving (Show, Eq, Foldable, Functor)
