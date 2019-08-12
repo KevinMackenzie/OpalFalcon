@@ -75,6 +75,9 @@ white = constVec 255
 whitef :: ColorRGBf
 whitef = constVec 1.0
 
+gray :: (Vector a) => b -> a b
+gray = constVec
+
 black :: (Num a) => Vec3 a
 black = constVec (fromInteger 0)
 

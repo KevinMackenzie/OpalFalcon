@@ -34,9 +34,12 @@ deriveRay h r =
           , rayHit = Just h
           }
 
+ambientLighting :: ColorRGBf
+ambientLighting = gray 0.15
+
 traceRay :: (ObjectCollection o) => Scene o -> (RtRay -> Bool) -> RtRay -> ColorRGBf
 traceRay scene br ray =
-    if br ray then evaluateRayColor (sampleLights scene $ R.pos $ rayBase ray) black ray
+    if br ray then evaluateRayColor (sampleLights ambientLighting scene $ R.pos $ rayBase ray) black ray
     else let aRay = advanceRtRay ray
          in  case (probeCollection (objects scene) (rayBase aRay)) of
                  Nothing -> black

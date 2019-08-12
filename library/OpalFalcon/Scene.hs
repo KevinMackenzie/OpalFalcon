@@ -11,9 +11,9 @@ data Scene o = MkScene { objects :: o
                        , lightSources :: [Bt.LightSource]
                        }
 
-sampleLights :: (ObjectCollection c) => Scene c -> Vec3d -> ColorRGBf
-sampleLights s p =
-    foldr (|+|) black $ 
+sampleLights :: (ObjectCollection c) => ColorRGBf -> Scene c -> Vec3d -> ColorRGBf
+sampleLights a s p =
+    foldr (|+|) a $ 
         map (\x -> (Bt.lightSample x) (probeCollection $ objects s) p) $ 
             lightSources s
 
