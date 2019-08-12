@@ -99,6 +99,9 @@ mag v = sqrt $ foldr (+) 0 $ v |*| v
 -- Normalize
 normalize :: (Vector a, Floating b) => a b -> a b
 normalize v = fmap ( / (mag v)) v
+-- Clamp
+clamp :: (Vector a, Ord b) => a b -> a b -> a b
+clamp = liftF2 (\x y -> if x < y then x else y)
 -- Cross Product (only defined on vec3's)
 (|><|) :: (Num a) => (Vec3 a) -> (Vec3 a) -> (Vec3 a)
 (|><|) (V3 a1 a2 a3) (V3 b1 b2 b3) = (V3 (a2*b3-a3*b2) (a3*b1-a1*b3) (a1*b2-a2*b1))

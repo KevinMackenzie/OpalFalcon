@@ -6,6 +6,7 @@ import OpalFalcon.BaseTypes as Bt
 import OpalFalcon.Scene.Objects.Sphere as S
 import OpalFalcon.Scene.Objects.Plane as P
 import OpalFalcon.Scene.Objects.Disc as D
+import OpalFalcon.Scene.Objects.PointLight as PL
 
 -- Makes an object out of a sphere
 mkSphereObject :: Vec3d -> Double -> Bt.Object
@@ -26,3 +27,5 @@ mkDiscObject plane@(MkPlane (MkRay p _)) radius =
              , objIntersectRay = D.hittestDisc (D.MkDisc plane radius)
              }
 
+mkPointLight :: Vec3d -> ColorRGBf -> Float -> LightSource
+mkPointLight p c d = MkLight { lightSample = PL.samplePointLight (PL.MkPL p c d) } 

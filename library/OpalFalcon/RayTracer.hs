@@ -1,36 +1,49 @@
 module OpalFalcon.RayTracer where
 
+import Data.Maybe
+import Data.Bits
+
 import OpalFalcon.Math.Vector
 import qualified OpalFalcon.Math.Ray as R
 import OpalFalcon.BaseTypes
 import OpalFalcon.Scene
-import Data.Bits
 import OpalFalcon.Math.Transformations
 
 -- Small value to add to hits to prevent double-intersections
 epsilon :: Double
 epsilon = 0.00001
 
-breakRt bounces r = ((rayDepth r) > bounces) || origin == (R.dir $ rayBase r)
+breakRt bounces r = d > bounces || d < 0 where d = rayDepth r
 
 shootRay :: (ObjectCollection o) => Scene o -> R.Ray -> ColorRGBf
-shootRay scene ray = traceRay scene (breakRt 2) $ defaultRtRay ray
+shootRay scene ray = clamp whitef $ traceRay scene (breakRt 2) $ defaultRtRay ray
+
+advanceRtRay :: RtRay -> RtRay
+advanceRtRay r = 
+    MkRtR { rayBase = R.advanceRay (rayBase r) epsilon
+          , rayColor = rayColor r 
+          , rayDepth = rayDepth r
+          , rayHit = rayHit r
+          }
 
 deriveRay :: Hit -> RtRay -> RtRay
-deriveRay h r= MkRtR { rayBase = R.advanceRay (rayBase r) epsilon
-                      , rayColor = rayColor r 
-                      , rayDepth = (rayDepth r) + 1
-                      , rayHit = Just h
-                      }
+deriveRay h r = 
+    MkRtR { rayBase = rayBase r
+          , rayColor = rayColor r 
+          , rayDepth = (rayDepth r) + 1
+          , rayHit = Just h
+          }
 
--- TODO: 'deriveRay' needs the reflected direction
 traceRay :: (ObjectCollection o) => Scene o -> (RtRay -> Bool) -> RtRay -> ColorRGBf
 traceRay scene br ray =
-    if br ray then evaluateRayColor whitef ray
-    else case (probeCollection (objects scene) (rayBase ray)) of
-             Nothing -> (rayColor ray) |*| whitef
-             Just hit -> traceRay scene br $ deriveRay hit $ matApply (hitMat hit) hit ray
+    if br ray then evaluateRayColor (sampleLights scene $ R.pos $ rayBase ray) black ray
+    else let aRay = advanceRtRay ray
+         in  case (probeCollection (objects scene) (rayBase aRay)) of
+                 Nothing -> black
+                 Just hit -> traceRay scene br $ deriveRay hit $ matApply (hitMat hit) hit aRay
 
+evaluateRayColor :: ColorRGBf -> ColorRGBf -> RtRay -> ColorRGBf
+evaluateRayColor i fallback ray = (rayColor ray) |*| (fromMaybe fallback (((i |*|) . (matDiffuseColor . hitMat)) <$> (rayHit ray)))
 
 genPixMap :: Integer -> Integer -> [(Integer, Integer)]
 genPixMap x2 y2 = [(x,y) | x <- [-x2..(x2-1)],
