@@ -2,8 +2,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 module OpalFalcon.BaseTypes where
 
-import Data.Maybe
-
 import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Ray
 
@@ -51,6 +49,13 @@ data Object = MkObj { objPos :: Vec3d
                     , objIntersectRay :: Ray -> Maybe Hit
                     }
 
+-- Provides function to sample light source from a point in the scene
+--   This is only good for lambertian surfaces
+data LightSource = MkLight { lightSample :: (Ray -> Maybe Hit) -> Vec3d -> ColorRGBf }
+
+-- The concept is it is an arbitrary material applied to the parameter
+--  of a hit for a specific object.  This lets us avoid having 
+--  general-purpose "hit UV" properties and material mappings
 data AppliedMaterial = MkAppMat { matDiffuseColor :: ColorRGBf
                                 , matApply :: Hit -> RtRay -> RtRay
                                 }
@@ -70,10 +75,6 @@ instance Locatable RtRay where
     position = pos . rayBase
 instance Locatable Hit where
     position = hitPos
-
-
-evaluateRayColor :: ColorRGBf -> RtRay -> ColorRGBf
-evaluateRayColor fallback ray = (rayColor ray) |*| (fromMaybe fallback ((matDiffuseColor . hitMat) <$> (rayHit ray)))
 
 -- Constructors et al
 defaultRtRay :: Ray -> RtRay
