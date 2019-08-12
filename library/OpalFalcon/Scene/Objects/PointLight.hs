@@ -1,6 +1,7 @@
 module OpalFalcon.Scene.Objects.PointLight where
 
 import OpalFalcon.BaseTypes
+import OpalFalcon.Math.Lighting
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
 
@@ -12,6 +13,6 @@ samplePointLight (MkPL lPos lCol lPow) probe oPos =
     case probe $ MkRay lPos $ normalize $ oPos |-| lPos of
         Nothing -> black
         Just h -> if (hitPos h) ~= oPos 
-                      then let r = realToFrac (distance lPos oPos) in (lPow / (r*r)) *| lCol
+                      then lCol |* (realToFrac (attenuate (realToFrac lPow) lPos oPos)) 
                       else black
 

@@ -20,12 +20,12 @@ class (Foldable a, Apply a) => Vector a where
 (|*|) = liftF2 (*)
 
 -- Approximately equal to with default epsilon
-(~=) :: (Vector a, Ord b, Floating b) => a b -> a b -> Bool
+(~=) :: (Vector a, Ord b, Fractional b) => a b -> a b -> Bool
 (~=) = approxEq 0.00001
 
 -- Used to see if two vectors are approximately equal to 
 --  handle floating-point errors
-approxEq :: (Vector a, Ord b, Floating b) => b -> a b -> a b -> Bool
+approxEq :: (Vector a, Ord b, Fractional b) => b -> a b -> a b -> Bool
 approxEq e v0 v1 = foldr (&&) True $ liftF2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
 
 -- Higher-order types
@@ -92,13 +92,25 @@ black = constVec (fromInteger 0)
 -- Negate
 negateVec :: (Vector a, Num b) => a b -> a b
 negateVec = fmap negate
+-- Promote* converts lower order vectors into higher order ones
+promote3 :: (Num a) => Vec2 a -> Vec3 a
+promote3 (V2 x y) = V3 x y (fromInteger 0)
 -- Distance function
 distance :: (Vector a, Floating b) => a b -> a b -> b
 distance v0 v1 = mag $ v0 |-| v1
-
 -- Magnitude
 mag :: (Vector a, Floating b) => a b -> b
 mag v = sqrt $ foldr (+) 0 $ v |*| v
+-- Sum
+vecSum :: (Vector a, Fractional b, Foldable c) => c (a b) -> a b
+vecSum = foldr (|+|) origin
+-- Average
+vecAverage :: (Vector a, Fractional b, Foldable c) => c (a b) -> a b
+vecAverage l = 
+    let len = length l
+    in  case len of
+            0 -> origin
+            _ -> (vecSum l) |* (1.0 / (fromInteger $ toInteger $ len))
 -- Normalize
 normalize :: (Vector a, Floating b) => a b -> a b
 normalize v = fmap ( / (mag v)) v
@@ -113,7 +125,7 @@ toPixel :: ColorRGBf -> ColorRGB
 toPixel = fmap (round . (255*))
 
 -- Functions for converting vectors to and from homogeneous coords
-fromHomo :: (Floating a) => Vec4 a -> Vec3 a
+fromHomo :: (Fractional a) => Vec4 a -> Vec3 a
 fromHomo (V4 x y z w) = V3 (x/w) (y/w) (z/w)
 toHomo :: (Num a) => Vec3 a -> a -> Vec4 a
 toHomo (V3 x y z) w = (V4 x y z w)
@@ -124,6 +136,6 @@ toHomoDir v = toHomo v 0
 
 -- Reflection assumes 'norm' is normalized
 --  Note: 'v' is centered at the origin; 'incoming' vectors must be flipped
-reflect :: (Floating a) => Vec3 a -> Vec3 a -> Vec3 a
+reflect :: (Fractional a) => Vec3 a -> Vec3 a -> Vec3 a
 reflect v norm = ((2 * (v |.| norm)) *| norm) |-| v
 
