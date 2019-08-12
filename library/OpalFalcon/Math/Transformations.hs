@@ -34,11 +34,11 @@ perspective near far fov =
     where s = 1/(tan ((fov*pi)/(360)))
           d = far-near
 
-applyTransform :: (Num a) => Vec4 a -> Matrix4 a -> Vec4 a
-applyTransform v m =
+applyTransform :: (Num a) => Matrix4 a -> Vec4 a -> Vec4 a
+applyTransform m v =
     let t = transpose m
     in  fmap (v |.|) t
 
-applyTransformStack :: (Foldable a, Num b) => Vec4 b -> a (Matrix4 b) -> Vec4 b
-applyTransformStack v s = applyTransform v (foldr (||*||) identity s)
+applyTransformStack :: (Foldable a, Num b) => a (Matrix4 b) -> Vec4 b -> Vec4 b
+applyTransformStack s = applyTransform (foldr (||*||) identity s)
 
