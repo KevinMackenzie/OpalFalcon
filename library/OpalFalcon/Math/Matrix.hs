@@ -9,6 +9,12 @@ type Matrix4 a = Vec4 (Vec4 a)
 type Matrix3d = Matrix3 Double
 type Matrix4d = Matrix4 Double
 
+identity :: (Num a) => Matrix4 a
+identity = (V4 (V4 1 0 0 0)
+               (V4 0 1 0 0)
+               (V4 0 0 1 0)
+               (V4 0 0 0 1))
+
 transpose :: Matrix4 a -> Matrix4 a
 transpose (V4 (V4 a00 a01 a02 a03) 
               (V4 a10 a11 a12 a13)

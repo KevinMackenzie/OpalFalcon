@@ -2,26 +2,31 @@ module OpalFalcon.Scene.Objects.Plane where
 
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
+import OpalFalcon.Math.Transformations
 import OpalFalcon.BaseTypes
-import OpalFalcon.Material
 
-data Plane = MkPlane Ray
+type PlaneMat = Plane -> Vec3d -> AppliedMaterial
+-- A plane is a a vector space in the positive z direction
+newtype Plane = MkPlane VectorSpace
 
 -- Hittest that ignores backface hits
-hittestPlaneFront :: Plane -> Ray -> Maybe Hit
-hittestPlaneFront p@(MkPlane (MkRay _ pDir)) r@(MkRay _ rDir) = if (pDir |.| rDir) > 0 then Nothing else hittestPlane p r
+hittestPlaneFront :: Plane -> PlaneMat -> Ray -> Maybe Hit
+hittestPlaneFront p@(MkPlane space) mat r@(MkRay _ rDir) = if ((zDir space) |.| rDir) > 0 then Nothing else hittestPlane p mat r
 
 -- Hittests either side of a plane
-hittestPlane :: Plane -> Ray -> Maybe Hit
-hittestPlane (MkPlane (MkRay pPos pDir)) r@(MkRay rPos rDir) =
-    let d = pDir |.| rDir
+hittestPlane :: Plane -> PlaneMat -> Ray -> Maybe Hit
+hittestPlane plane@(MkPlane space) mat r@(MkRay rPos rDir) =
+    let pDir = zDir space
+        pPos = spacePos space
+        d = pDir |.| rDir
         relPos = pPos |-| rPos
         p = (relPos |.| pDir) / d
+        hPos = pointAtParameter r p
     in  if (abs d) < 0.000001 || p < 0 then Nothing
-        else Just MkHit { hitPos = pointAtParameter r p
+        else Just MkHit { hitPos = hPos
                         , hitNorm = pDir
                         , hitInc = r
                         , hitParam = p
-                        , hitMat = mkDiffuseMat (V3 0.5 0.5 0.5)
+                        , hitMat = mat plane hPos
                         }
 

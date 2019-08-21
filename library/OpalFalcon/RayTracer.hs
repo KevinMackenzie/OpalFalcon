@@ -13,6 +13,7 @@ import OpalFalcon.Math.Transformations
 epsilon :: Double
 epsilon = 0.00001
 
+breakRt :: Integer -> RtRay -> Bool
 breakRt bounces r = d > bounces || d < 0 where d = rayDepth r
 
 shootRay :: (ObjectCollection o) => Scene o -> R.Ray -> ColorRGBf

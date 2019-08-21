@@ -9,17 +9,21 @@ import OpalFalcon.Math.Matrix
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Scene.Objects.Plane
 
--- A plane bounded to a circular region
+type DiscMat = Disc -> Vec3d -> AppliedMaterial
+-- A plane bounded to a radius
 data Disc = MkDisc Plane Double
 
-hittestDisc :: Disc -> Ray -> Maybe Hit
-hittestDisc q@(MkDisc p _) r = 
-    case (hittestPlane p r) of
+discMatToPlaneMat :: Disc -> DiscMat -> PlaneMat
+discMatToPlaneMat (MkDisc _ d) mat plane = mat (MkDisc plane d)
+
+hittestDisc :: Disc -> DiscMat -> Ray -> Maybe Hit
+hittestDisc q@(MkDisc p _) mat r =
+    case (hittestPlane p (discMatToPlaneMat q mat) r) of
         Nothing -> Nothing
         Just h -> cropPlaneHit q h
 
 cropPlaneHit :: Disc -> Hit -> Maybe Hit
-cropPlaneHit (MkDisc (MkPlane (MkRay pPos _)) r) h = if (distance pPos $ hitPos h) < r then Just h else Nothing
+cropPlaneHit (MkDisc (MkPlane space) r) h = if (distance (spacePos space) $ hitPos h) < r then Just h else Nothing
 
 -- Generates points on an (sxs) square centered at the origin; TODO: use RNG
 generateSquarePoints :: Double -> Integer -> [Vec2d]
@@ -33,7 +37,7 @@ generateUnitDiscPoints :: Integer -> [Vec2d]
 generateUnitDiscPoints c = filter (((>) 1.0) . mag) $ generateSquarePoints 2.0 c
 
 getDiscTransform :: Disc -> Matrix4d
-getDiscTransform (MkDisc (MkPlane (MkRay dPos dDir)) _) = (translate dPos) ||*|| (lookAt dDir)
+getDiscTransform (MkDisc (MkPlane space) _) = (translate (spacePos space)) ||*|| (lookAt $ zDir space)
 
 transformDiscPoint :: Disc -> Vec2d -> Vec3d
 transformDiscPoint d v = applyTransform3 (getDiscTransform d) $ promote3 v

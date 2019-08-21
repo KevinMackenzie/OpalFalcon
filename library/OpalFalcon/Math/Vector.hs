@@ -81,6 +81,16 @@ gray = constVec
 black :: (Num a) => Vec3 a
 black = constVec (fromInteger 0)
 
+-- (r, theta)
+-- type PolarCoords = Vec2d
+-- toPolar :: Vec2d
+-- toPolar (V2 x y) = V2 (sqrt $ x*x + y*y) (atan x y)
+
+-- Represents spherical coordinates (radius, theta, psi) where theta is the polar angle and psi is the azimuth angle
+-- type SphereCoords = Vec3d
+-- toSphere :: Vec3d -> SphereCoords
+-- toSphere (V3 x y z) = V3 (sqrt $ x*x + y*y + z*z) (atan x y) (atan z $ sqrt $ x*x + y*y)
+
 -- Multiply by scalar
 (*|) :: (Vector a, Num b) => b -> a b -> a b
 (*|) s = fmap (s*)
@@ -94,7 +104,12 @@ negateVec :: (Vector a, Num b) => a b -> a b
 negateVec = fmap negate
 -- Promote* converts lower order vectors into higher order ones
 promote3 :: (Num a) => Vec2 a -> Vec3 a
-promote3 (V2 x y) = V3 x y (fromInteger 0)
+promote3 (V2 x y) = V3 x y 0
+-- Demote* converts higher order vectors into lower order ones
+demote4 :: Vec4 a -> Vec3 a
+demote4 (V4 x y z _) = V3 x y z
+demote3 :: Vec3 a -> Vec2 a
+demote3 (V3 x y _) = V2 x y
 -- Distance function
 distance :: (Vector a, Floating b) => a b -> a b -> b
 distance v0 v1 = mag $ v0 |-| v1

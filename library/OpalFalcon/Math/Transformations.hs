@@ -3,8 +3,9 @@ module OpalFalcon.Math.Transformations where
 import OpalFalcon.Math.Matrix
 import OpalFalcon.Math.Vector
 
-identity :: (Num a) => Matrix4 a
-identity = fmap (\x -> fmap fromInteger x) (V4 (V4 1 0 0 0) (V4 0 1 0 0) (V4 0 0 1 0) (V4 0 0 0 1))
+-- A Vector space is a possibly invertable transformation from the external space to the internal space
+-- data VectorSpace = MkVectorSpace Matrix4d (Maybe Matrix4d)
+type VectorSpace = Matrix4d
 
 translate :: (Num a) => Vec3 a -> Matrix4 a
 translate d = 
@@ -16,6 +17,22 @@ scale (V3 x y z) = (V4 (V4 x 0 0 0) (V4 0 y 0 0) (V4 0 0 z 0) (V4 0 0 0 1))
 
 scaleUniform :: (Num a) => a -> Matrix4 a
 scaleUniform s = scale (V3 s s s)
+
+orthoX :: (Num a) => Matrix4 a
+orthoX = (V4 (V4 0 0 0 0)
+             (V4 0 1 0 0)
+             (V4 0 0 1 0)
+             (V4 0 0 0 1))
+orthoY :: (Num a) => Matrix4 a
+orthoY = (V4 (V4 1 0 0 0)
+             (V4 0 0 0 0)
+             (V4 0 0 0 0)
+             (V4 0 0 0 1))
+orthoZ :: (Num a) => Matrix4 a
+orthoZ = (V4 (V4 1 0 0 0)
+             (V4 0 1 0 0)
+             (V4 0 0 0 0)
+             (V4 0 0 0 1))
 
 flipY :: (Num a) => Matrix4 a
 flipY = (V4 (V4 1 0 0 0)
@@ -53,4 +70,29 @@ applyTransform3 m v = fromHomo $ applyTransform m $ toHomoPos v
 
 applyTransformStack :: (Foldable a, Num b) => a (Matrix4 b) -> Vec4 b -> Vec4 b
 applyTransformStack s = applyTransform (foldr (||*||) identity s)
+
+zDir :: Matrix4 a -> Vec3 a
+zDir (V4 _ _ z _) = demote4 z
+-- in general: zDir m = applyTransform m zAxis
+
+spacePos :: Matrix4 a -> Vec3 a
+spacePos (V4 _ _ _ w) = demote4 w
+-- in general: spacePos m = applyTransform m origin
+
+xAxis :: (Num a) => Vec3 a
+yAxis :: (Num a) => Vec3 a
+zAxis :: (Num a) => Vec3 a
+
+xAxis = (V3 1 0 0)
+yAxis = (V3 0 1 0)
+zAxis = (V3 0 0 1)
+
+-- Creates a vector space out of the provided position and basis vectors
+mkAffineSpace :: Vec3d -> Vec3d -> Vec3d -> Vec3d -> VectorSpace
+mkAffineSpace pos x y z = (V4 (toHomoDir x)
+                        (toHomoDir y)
+                        (toHomoDir z)
+                        (toHomoPos pos))
+
+-- TODO: add ortho(normal), non-affine, and invertable space constructors
 

@@ -1,26 +1,27 @@
 module OpalFalcon.Scene.Objects.Sphere where
 
 import OpalFalcon.Math.Vector
+import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Ray
 import OpalFalcon.BaseTypes
-import OpalFalcon.Material
 
-data Sphere = MkSphere Vec3d Double
+type SphereMat = Sphere -> Vec3d -> AppliedMaterial
+data Sphere = MkSphere VectorSpace Double
 
-hittestSphere :: Sphere -> Ray -> Maybe Hit
-hittestSphere s r =
-    (calcSphereHit s r) <$> (intersectSphere s r)
+hittestSphere :: Sphere -> SphereMat -> Ray -> Maybe Hit
+hittestSphere s m r =
+    (calcSphereHit s m r) <$> (intersectSphere s r)
 
-calcSphereHit :: Sphere -> Ray -> Double -> Hit
-calcSphereHit (MkSphere sPos _) r p =
-    let hPos = pointAtParameter r p
+calcSphereHit :: Sphere -> SphereMat -> Ray -> Double -> Hit
+calcSphereHit sphere@(MkSphere space _) mat r p =
+    let sPos = spacePos space
+        hPos = pointAtParameter r p
         norm = normalize $ hPos |-| sPos
     in  MkHit { hitPos = hPos
               , hitNorm = norm
               , hitInc = r
               , hitParam = p
-              -- For now
-              , hitMat = mkSimpleMat (V3 0.0 0.0 0.0) (V3 0.8 0.1 0.1)
+              , hitMat = mat sphere hPos
               }
 
 
@@ -39,8 +40,9 @@ filterNegativeParameters (p0, p1) =
 
 -- Basic Ray-sphere intersection: will return negative results
 getSphereParameters :: Sphere -> Ray -> (Maybe Double, Maybe Double)
-getSphereParameters (MkSphere sPos rad) (MkRay rPos rDir) = 
-    let newOrigin = rPos |-| sPos
+getSphereParameters (MkSphere space rad) (MkRay rPos rDir) = 
+    let sPos = spacePos space
+        newOrigin = rPos |-| sPos
         a = 1
         b = 2*(newOrigin |.| rDir)
         mNewOrigin = mag newOrigin

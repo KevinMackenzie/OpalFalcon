@@ -1,7 +1,7 @@
 module OpalFalcon.Scene.Objects where
 
 import OpalFalcon.Math.Vector
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Transformations
 import OpalFalcon.BaseTypes as Bt
 import OpalFalcon.Scene.Objects.Sphere as S
 import OpalFalcon.Scene.Objects.Plane as P
@@ -9,23 +9,25 @@ import OpalFalcon.Scene.Objects.Disc as D
 import OpalFalcon.Scene.Objects.PointLight as PL
 import OpalFalcon.Scene.Objects.DiscLight as DL
 
+-- TODO: this is not straightforward.  Make constructors from objects and their materials.  The separation is so we can have the same objects rendered with different materials so real-time interface can use simple materials?  Or maybe we can just use the 'diffuse' component of the material?
+
 -- Makes an object out of a sphere
-mkSphereObject :: Vec3d -> Double -> Bt.Object
-mkSphereObject p r = 
-    Bt.MkObj { objPos = p
-             , objIntersectRay = S.hittestSphere (MkSphere p r)
+mkSphereObject :: Sphere -> SphereMat -> Bt.Object
+mkSphereObject sphere@(MkSphere space _) mat = 
+    Bt.MkObj { objPos = spacePos space
+             , objIntersectRay = S.hittestSphere sphere mat
              }
 
-mkPlaneObject :: Ray -> Bt.Object
-mkPlaneObject ray@(MkRay pPos _) = 
-    Bt.MkObj { objPos = pPos
-             , objIntersectRay = P.hittestPlaneFront (MkPlane ray)
+mkPlaneObject :: Plane -> PlaneMat -> Bt.Object
+mkPlaneObject plane@(MkPlane space) mat = 
+    Bt.MkObj { objPos = spacePos space
+             , objIntersectRay = P.hittestPlaneFront plane mat
              }
 
-mkDiscObject :: Plane -> Double -> Bt.Object
-mkDiscObject plane@(MkPlane (MkRay p _)) radius =
-    Bt.MkObj { objPos = p
-             , objIntersectRay = D.hittestDisc (D.MkDisc plane radius)
+mkDiscObject :: Disc -> DiscMat -> Bt.Object
+mkDiscObject disc@(MkDisc (MkPlane space) _) mat =
+    Bt.MkObj { objPos = spacePos space
+             , objIntersectRay = D.hittestDisc disc mat
              }
 
 mkDiscLight :: D.Disc -> ColorRGBf -> Float -> LightSource
