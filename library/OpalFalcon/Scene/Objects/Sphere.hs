@@ -1,4 +1,8 @@
-module OpalFalcon.Scene.Objects.Sphere where
+module OpalFalcon.Scene.Objects.Sphere (
+    SphereMat,
+    Sphere(MkSphere),
+    hittestSphere
+    ) where
 
 import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Transformations

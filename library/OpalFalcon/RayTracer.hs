@@ -1,4 +1,6 @@
-module OpalFalcon.RayTracer where
+module OpalFalcon.RayTracer (
+    rayTraceScene 
+    ) where
 
 import Data.Maybe
 import Data.Bits

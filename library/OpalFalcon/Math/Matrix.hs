@@ -26,6 +26,11 @@ transpose (V4 (V4 a00 a01 a02 a03)
         (V4 a03 a13 a23 a33))
 
 (||*||) :: (Num a) => Matrix4 a -> Matrix4 a -> Matrix4 a
+-- TODO: we should optimize for identity case
+-- (||*||) m0 (V4 (V4 1 0 0 0)
+--                (V4 0 1 0 0)
+--                (V4 0 0 1 0)
+--                (V4 0 0 0 1)) = m0
 (||*||) (V4 c0 c1 c2 c3) 
         (V4 (V4 a00 a01 a02 a03) 
             (V4 a10 a11 a12 a13) 
@@ -35,4 +40,7 @@ transpose (V4 (V4 a00 a01 a02 a03)
         ((a10 *| c0) |+| (a11 *| c1) |+| (a12 *| c2) |+| (a13 *| c3))
         ((a20 *| c0) |+| (a21 *| c1) |+| (a22 *| c2) |+| (a23 *| c3))
         ((a30 *| c0) |+| (a31 *| c1) |+| (a32 *| c2) |+| (a33 *| c3)))
+
+invert :: Matrix4 a -> Matrix4 a
+invert _ = undefined -- TODO
 

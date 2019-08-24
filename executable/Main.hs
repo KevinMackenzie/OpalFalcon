@@ -52,7 +52,6 @@ main = let w = 500
            -- h1 = fmap ((probeCollection ol) . rayBase) r1
            -- hitPlane = hittestPlane (MkPlane (MkRay (V3 0 (-3) 0) (V3 0 1 0))) (MkRay origin $ normalize (V3 0 (-1) (-1)))
            ls = sampleLights (gray 0.1) sc $ V3 0 (-2) 0
-           ds = generateUnitDiscPoints 10
        in  do {
            -- writeFile "outfile.ppm" $ encodePpm pixs 100 100;
            saveToPng "pngfile.png" pixs w h;
@@ -64,7 +63,6 @@ main = let w = 500
            -- print $ objIntersectRay sph (MkRay (V3 0 0 10) (V3 0 0 (-1)));
            print $ ls;
            -- print $ hitPlane;
-           print $ ds;
            }
 
 -- TODO: uhh, write some fucking tests.  That's how you debug FP

@@ -1,4 +1,7 @@
-module OpalFalcon.Scene.Objects.PointLight where
+module OpalFalcon.Scene.Objects.PointLight (
+    PointLight(MkPL),
+    samplePointLight
+    ) where
 
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Lighting

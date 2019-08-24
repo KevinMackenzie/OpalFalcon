@@ -1,4 +1,6 @@
-module OpalFalcon.Scene.ObjectCollections.ObjectList where
+module OpalFalcon.Scene.ObjectCollections.ObjectList (
+    ObjectList(MkObjList, objList)
+    ) where
 
 import OpalFalcon.Math.Ray
 import OpalFalcon.BaseTypes

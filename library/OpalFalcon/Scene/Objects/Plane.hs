@@ -1,4 +1,9 @@
-module OpalFalcon.Scene.Objects.Plane where
+module OpalFalcon.Scene.Objects.Plane (
+    PlaneMat,
+    Plane(MkPlane),
+    hittestPlaneFront,
+    hittestPlane
+    ) where
 
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector

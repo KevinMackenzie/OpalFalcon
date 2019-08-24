@@ -1,4 +1,8 @@
-module OpalFalcon.Scene where
+module OpalFalcon.Scene (
+    ObjectCollection(probeCollection),
+    Scene(MkScene, objects, lightSources),
+    sampleLights
+    ) where
 
 import qualified OpalFalcon.BaseTypes as Bt
 import qualified OpalFalcon.Math.Ray as R

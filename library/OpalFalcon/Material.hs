@@ -1,4 +1,7 @@
-module OpalFalcon.Material where
+module OpalFalcon.Material (
+    mkDiffuseMat,
+    mkSimpleMat
+    ) where
 
 import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Ray
@@ -7,17 +10,16 @@ import OpalFalcon.BaseTypes
 -- TODO: this could be improved because we may have one material
 -- that can accept multiple different reflection algorithms
 
--- TODO: figure out how to handle materials, how they should mutate RTRays, etc.
--- When we have determined we should stop reflecting, we ray-test every light source and calc based on diffuse mat color
 -- BSSRDF materials should require an object collection of light sources for each step
 
 reflectRayOverHit :: Hit -> Ray -> Ray
-reflectRayOverHit h r@(MkRay rPos _) = MkRay (hitPos h) $ reflectRay r $ hitNorm h
+reflectRayOverHit h r@(MkRay _ _) = MkRay (hitPos h) $ reflectRay r $ hitNorm h
 
 -- Breaking constant accounts for "+1" that will follow this
 breakConst :: Integer
 breakConst = -2
 
+diffuseApply :: Hit -> RtRay -> RtRay
 diffuseApply h r = 
     MkRtR { rayBase = reflectRayOverHit h $ rayBase r
           , rayColor = rayColor r
