@@ -4,20 +4,23 @@
 module OpalFalcon.Math.Vector where
 
 import Data.Word (Word8)
-import Data.Functor.Apply (Apply, Functor, (<.>), liftF2)
+import Control.Applicative(Applicative, (<*>), liftA2)
 
 -- Base typeclasses
-class (Foldable a, Apply a) => Vector a where
-    constVec :: b -> a b
+class (Foldable a, Applicative a) => Vector a where
+    placeholder :: a b -> a b
+
+constVec :: Vector a => b -> a b
+constVec = pure
 
 -- Arithmetic operations on vectors
 (|+|) :: (Vector a, Num b) => a b -> a b -> a b
 (|-|) :: (Vector a, Num b) => a b -> a b -> a b
 (|*|) :: (Vector a, Num b) => a b -> a b -> a b
 
-(|+|) = liftF2 (+)
-(|-|) = liftF2 (-)
-(|*|) = liftF2 (*)
+(|+|) = liftA2 (+)
+(|-|) = liftA2 (-)
+(|*|) = liftA2 (*)
 
 -- Approximately equal to with default epsilon
 (~=) :: (Vector a, Ord b, Fractional b) => a b -> a b -> Bool
@@ -26,7 +29,7 @@ class (Foldable a, Apply a) => Vector a where
 -- Used to see if two vectors are approximately equal to 
 --  handle floating-point errors
 approxEq :: (Vector a, Ord b, Fractional b) => b -> a b -> a b -> Bool
-approxEq e v0 v1 = foldr (&&) True $ liftF2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
+approxEq e v0 v1 = foldr (&&) True $ liftA2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
 
 -- Higher-order types
 data Vec2 a = V2 a a
@@ -37,20 +40,23 @@ data Vec4 a = V4 a a a a
     deriving (Show, Eq, Foldable, Functor)
 
 -- Instances for low-dimmension vectors
-instance Apply Vec2 where
-    (<.>) (V2 fx fy) (V2 x y)  = (V2 (fx x) (fy y))
+instance Applicative Vec2 where
+    pure x = V2 x x
+    (<*>) (V2 fx fy) (V2 x y)  = (V2 (fx x) (fy y))
 instance Vector Vec2 where
-    constVec v = (V2 v v)
+    placeholder = id
 
-instance Apply Vec3 where
-    (<.>) (V3 fx fy fz) (V3 x y z)  = (V3 (fx x) (fy y) (fz z))
+instance Applicative Vec3 where
+    pure x = V3 x x x
+    (<*>) (V3 fx fy fz) (V3 x y z)  = (V3 (fx x) (fy y) (fz z))
 instance Vector Vec3 where
-    constVec v = (V3 v v v)
+    placeholder = id
 
-instance Apply Vec4 where
-    (<.>) (V4 fx fy fz fw) (V4 x y z w)  = (V4 (fx x) (fy y) (fz z) (fw w))
+instance Applicative Vec4 where
+    pure x = V4 x x x x
+    (<*>) (V4 fx fy fz fw) (V4 x y z w)  = (V4 (fx x) (fy y) (fz z) (fw w))
 instance Vector Vec4 where
-    constVec v = (V4 v v v v)
+    placeholder = id
 
 -- Vector type specializations
 type Vec2d = Vec2 Double
@@ -131,7 +137,7 @@ normalize :: (Vector a, Floating b) => a b -> a b
 normalize v = fmap ( / (mag v)) v
 -- Clamp
 clamp :: (Vector a, Ord b) => a b -> a b -> a b
-clamp = liftF2 (\x y -> if x < y then x else y)
+clamp = liftA2 (\x y -> if x < y then x else y)
 -- Cross Product (only defined on vec3's)
 (|><|) :: (Num a) => (Vec3 a) -> (Vec3 a) -> (Vec3 a)
 (|><|) (V3 a1 a2 a3) (V3 b1 b2 b3) = (V3 (a2*b3-a3*b2) (a3*b1-a1*b3) (a1*b2-a2*b1))

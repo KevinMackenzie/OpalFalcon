@@ -23,8 +23,6 @@ ghc-options: -Wall
 library:
   dependencies:
   - base
-  - semigroupoids
-  - bytestring
   - vector
   - bytestring
   - JuicyPixels
