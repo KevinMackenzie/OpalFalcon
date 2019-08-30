@@ -3,6 +3,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 module OpalFalcon.Math.Vector where
 
+-- TODO: pattern matching is just a convenience that made writing the initial code easier.  We should instead use fixed-length, unboxed vectors for all built-in aliases (for primative data types) and allow the user to modify the contents to generate new vectors and to extract components of the vectors
+
 import Data.Word (Word8)
 import Control.Applicative(Applicative, (<*>), liftA2)
 
@@ -31,6 +33,7 @@ constVec = pure
 approxEq :: (Vector a, Ord b, Fractional b) => b -> a b -> a b -> Bool
 approxEq e v0 v1 = foldr (&&) True $ liftA2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
 
+-- If we don't support pattern matching (like using vectors/arrays) we don't need 'data' declarations for each vector length
 -- Higher-order types
 data Vec2 a = V2 a a
     deriving (Show, Eq, Foldable, Functor)
@@ -86,6 +89,22 @@ gray = constVec
 
 black :: (Num a) => Vec3 a
 black = constVec (fromInteger 0)
+
+xPos :: Vec3 a -> a
+yPos :: Vec3 a -> a
+zPos :: Vec3 a -> a
+
+xPos (V3 x _ _) = x
+yPos (V3 _ y _) = y
+zPos (V3 _ _ z) = z
+
+mutX :: Vec3 a -> a -> Vec3 a
+mutY :: Vec3 a -> a -> Vec3 a
+mutZ :: Vec3 a -> a -> Vec3 a
+
+mutX (V3 _ y z) x = V3 x y z
+mutY (V3 x _ z) y = V3 x y z
+mutZ (V3 x y _) z = V3 x y z
 
 -- (r, theta)
 -- type PolarCoords = Vec2d
