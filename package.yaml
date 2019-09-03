@@ -24,6 +24,7 @@ library:
   dependencies:
   - base
   - vector
+  - fixed-vector
   - bytestring
   - JuicyPixels
   source-dirs: library
