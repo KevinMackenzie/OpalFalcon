@@ -19,10 +19,10 @@ scaleUniform :: (Num a) => a -> Matrix4 a
 scaleUniform s = scale (V3 s s s)
 
 orthoX :: (Num a) => Matrix4 a
-orthoX = (V4 (V4 0 0 0 0)
-             (V4 0 1 0 0)
-             (V4 0 0 1 0)
-             (V4 0 0 0 1))
+orthoX = (mkV4 (mkV4 0 0 0 0)
+               (mkV4 0 1 0 0)
+               (mkV4 0 0 1 0)
+               (mkV4 0 0 0 1))
 orthoY :: (Num a) => Matrix4 a
 orthoY = (V4 (V4 1 0 0 0)
              (V4 0 0 0 0)
