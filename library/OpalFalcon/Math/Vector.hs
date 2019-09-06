@@ -14,6 +14,11 @@ type Vec2 = VPrim.Vec2
 type Vec3 = VPrim.Vec3
 type Vec4 = VPrim.Vec4
 
+-- TODO: we don't need to define these for all types, and we don't want to carry the VPrim.Prim dependency everywhere either...but I don't want to lose generality
+mkV2 = mk2
+mkV3 = mk3
+mkV4 = mk4
+
 type Vec2d = Vec2 Double
 type Vec2i = Vec2 Int
 
@@ -76,9 +81,9 @@ mutX :: (VPrim.Prim a) => Vec3 a -> a -> Vec3 a
 mutY :: (VPrim.Prim a) => Vec3 a -> a -> Vec3 a
 mutZ :: (VPrim.Prim a) => Vec3 a -> a -> Vec3 a
 
-mutX v x = V.mk3 x         (v V.! 1) (v V.! 2)
-mutY v y = V.mk3 (v V.! 0) y         (v V.! 2)
-mutZ v z = V.mk3 (v V.! 0) (v V.! 1) z
+mutX v x = mkV3 x         (v V.! 1) (v V.! 2)
+mutY v y = mkV3 (v V.! 0) y         (v V.! 2)
+mutZ v z = mkV3 (v V.! 0) (v V.! 1) z
 
 -- (r, theta)
 -- type PolarCoords = Vec2d
@@ -103,12 +108,12 @@ negateVec :: (V.Vector a b, Num b) => a b -> a b
 negateVec = V.map negate
 -- Promote* converts lower order vectors into higher order ones
 promote3 :: (VPrim.Prim a, Num a) => Vec2 a -> Vec3 a
-promote3 v = V.mk3 (v V.! 0) (v V.! 1) 0
+promote3 v = mkV3 (v V.! 0) (v V.! 1) 0
 -- Demote* converts higher order vectors into lower order ones
 demote4 :: VPrim.Prim a => Vec4 a -> Vec3 a
-demote4 v = V.mk3 (v V.! 0) (v V.! 1) (v V.! 2)
+demote4 v = mkV3 (v V.! 0) (v V.! 1) (v V.! 2)
 demote3 :: VPrim.Prim a => Vec3 a -> Vec2 a
-demote3 v = V.mk2 (v V.! 0) (v V.! 1)
+demote3 v = mkV2 (v V.! 0) (v V.! 1)
 -- Distance function
 distance :: (V.Vector a b, Floating b) => a b -> a b -> b
 distance v0 v1 = mag $ v0 |-| v1
@@ -140,7 +145,7 @@ clamp = V.zipWith (\x y -> if x < y then x else y)
         b1 = xPos b
         b2 = yPos b
         b3 = zPos b
-    in  V.mk3 (a2*b3-a3*b2) (a3*b1-a1*b3) (a1*b2-a2*b1)
+    in  mkV3 (a2*b3-a3*b2) (a3*b1-a1*b3) (a1*b2-a2*b1)
 
 toPixel :: ColorRGBf -> ColorRGB
 toPixel = V.map (round . (255*))
@@ -152,9 +157,9 @@ fromHomo v =
         y = v V.! 1
         z = v V.! 2
         w = v V.! 3
-    in  V.mk3 (x/w) (y/w) (z/w)
+    in  mkV3 (x/w) (y/w) (z/w)
 toHomo :: (VPrim.Prim a, Num a) => Vec3 a -> a -> Vec4 a
-toHomo v w = V.mk4 (xPos v) (yPos v) (zPos v) w
+toHomo v w = mkV4 (xPos v) (yPos v) (zPos v) w
 toHomoPos :: (VPrim.Prim a, Num a) => Vec3 a -> Vec4 a
 toHomoPos v = toHomo v 1
 toHomoDir :: (VPrim.Prim a, Num a) => Vec3 a -> Vec4 a
