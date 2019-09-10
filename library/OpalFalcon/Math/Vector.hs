@@ -15,9 +15,12 @@ type Vec3 = VPrim.Vec3
 type Vec4 = VPrim.Vec4
 
 -- TODO: we don't need to define these for all types, and we don't want to carry the VPrim.Prim dependency everywhere either...but I don't want to lose generality
-mkV2 = mk2
-mkV3 = mk3
-mkV4 = mk4
+mkV2 :: (VPrim.Prim a) => a -> a -> Vec2 a
+mkV2 = V.mk2
+mkV3 :: (VPrim.Prim a) => a -> a -> a -> Vec3 a
+mkV3 = V.mk3
+mkV4 :: (VPrim.Prim a) => a -> a -> a -> a -> Vec4 a
+mkV4 = V.mk4
 
 type Vec2d = Vec2 Double
 type Vec2i = Vec2 Int
@@ -84,6 +87,16 @@ mutZ :: (VPrim.Prim a) => Vec3 a -> a -> Vec3 a
 mutX v x = mkV3 x         (v V.! 1) (v V.! 2)
 mutY v y = mkV3 (v V.! 0) y         (v V.! 2)
 mutZ v z = mkV3 (v V.! 0) (v V.! 1) z
+
+x4Pos :: (VPrim.Prim a) => Vec4 a -> a
+y4Pos :: (VPrim.Prim a) => Vec4 a -> a
+z4Pos :: (VPrim.Prim a) => Vec4 a -> a
+w4Pos :: (VPrim.Prim a) => Vec4 a -> a
+
+x4Pos v = v V.! 0
+y4Pos v = v V.! 1
+z4Pos v = v V.! 2
+w4Pos v = v V.! 3
 
 -- (r, theta)
 -- type PolarCoords = Vec2d
