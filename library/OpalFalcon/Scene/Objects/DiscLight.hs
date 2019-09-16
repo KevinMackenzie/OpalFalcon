@@ -22,7 +22,7 @@ generateSquarePoints s c =
     let offset = s / (fromInteger c) 
         c2 = shiftR c 2
         cSet = map (\x -> offset * (1+2*(fromInteger x))) [-c2..(c2-1)]
-    in  [V2 x y | x <- cSet, y <- cSet]
+    in  [mkV2 x y | x <- cSet, y <- cSet]
 
 generateUnitDiscPoints :: Integer -> [Vec2d]
 generateUnitDiscPoints c = filter (((>) 1.0) . mag) $ generateSquarePoints 2.0 c

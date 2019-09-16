@@ -11,7 +11,7 @@ saveToPng :: String -> [ColorRGBf] -> Integer -> Integer -> IO ()
 saveToPng p l w0 h0 = 
     let w = fromInteger w0
         h = fromInteger h0
-        pixs = V.fromList $ map (((\(mkV3 x y z) -> PixelRGB8 x y z) . toPixel) :: (ColorRGBf -> PixelRGB8)) l
+        pixs = V.fromList $ map (((\v -> PixelRGB8 (xPos v) (yPos v) (zPos v)) . toPixel) :: (ColorRGBf -> PixelRGB8)) l
         bs = encodePng $ generateImage (\x y -> pixs V.! ((h-1-y)+(w-1-x)*h)) w h
     in do Bs.writeFile p bs
 

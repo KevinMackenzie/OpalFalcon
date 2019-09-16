@@ -75,10 +75,12 @@ black = constVec 0
 xPos :: (VPrim.Prim a) => Vec3 a -> a
 yPos :: (VPrim.Prim a) => Vec3 a -> a
 zPos :: (VPrim.Prim a) => Vec3 a -> a
+v3T :: (VPrim.Prim a) => (Vec3 a) -> (a, a, a)
 
 xPos v = v V.! 0
 yPos v = v V.! 1
 zPos v = v V.! 2
+v3T v = (xPos v, yPos v, zPos v)
 
 mutX :: (VPrim.Prim a) => Vec3 a -> a -> Vec3 a
 mutY :: (VPrim.Prim a) => Vec3 a -> a -> Vec3 a
@@ -92,11 +94,14 @@ x4Pos :: (VPrim.Prim a) => Vec4 a -> a
 y4Pos :: (VPrim.Prim a) => Vec4 a -> a
 z4Pos :: (VPrim.Prim a) => Vec4 a -> a
 w4Pos :: (VPrim.Prim a) => Vec4 a -> a
+v4T :: (VPrim.Prim a) => (Vec4 a) -> (a, a, a, a)
 
 x4Pos v = v V.! 0
 y4Pos v = v V.! 1
 z4Pos v = v V.! 2
 w4Pos v = v V.! 3
+
+v4T v = (x4Pos v, y4Pos v, z4Pos v, w4Pos v)
 
 -- (r, theta)
 -- type PolarCoords = Vec2d
