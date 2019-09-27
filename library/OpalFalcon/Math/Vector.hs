@@ -1,16 +1,13 @@
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 module OpalFalcon.Math.Vector where
 
--- TODO: pattern matching is just a convenience that made writing the initial code easier.  We should instead use fixed-length, unboxed vectors for all built-in aliases (for primative data types) and allow the user to modify the contents to generate new vectors and to extract components of the vectors
-
 import Data.Word (Word8)
 import Control.Applicative(Applicative, (<*>), liftA2)
+import System.Random (Random(..), RandomGen)
 
 -- Base typeclasses
-class (Foldable a, Applicative a) => Vector a where
-    placeholder :: a b -> a b
+class (Foldable a, Applicative a) => Vector a where {}
 
 constVec :: Vector a => b -> a b
 constVec = pure
@@ -46,20 +43,17 @@ data Vec4 a = V4 !a !a !a !a
 instance Applicative Vec2 where
     pure x = V2 x x
     (<*>) (V2 fx fy) (V2 x y)  = (V2 (fx x) (fy y))
-instance Vector Vec2 where
-    placeholder = id
+instance Vector Vec2 where {}
 
 instance Applicative Vec3 where
     pure x = V3 x x x
     (<*>) (V3 fx fy fz) (V3 x y z)  = (V3 (fx x) (fy y) (fz z))
-instance Vector Vec3 where
-    placeholder = id
+instance Vector Vec3 where {}
 
 instance Applicative Vec4 where
     pure x = V4 x x x x
     (<*>) (V4 fx fy fz fw) (V4 x y z w)  = (V4 (fx x) (fy y) (fz z) (fw w))
-instance Vector Vec4 where
-    placeholder = id
+instance Vector Vec4 where {}
 
 -- Vector type specializations
 type Vec2d = Vec2 Double
@@ -178,4 +172,24 @@ toHomoDir v = toHomo v 0
 --  Note: 'v' is centered at the origin; 'incoming' vectors must be flipped
 reflect :: (Fractional a) => Vec3 a -> Vec3 a -> Vec3 a
 reflect v norm = ((2 * (v |.| norm)) *| norm) |-| v
+
+
+-- Random vector generation on the unit sphere.  These vectors can be transformed
+--   to make the results not uniformly sampled (i.e. for importance sampling)
+randomVec3 :: (Random a, RandomGen g) => (Vec3 a, Vec3 a) -> g -> (Vec3 a, g)
+randomVec3 (V3 xmn ymn zmn, V3 xmx ymx zmx) g =         
+    let (x, r0) = randomR (xmn, xmx) g
+        (y, r1) = randomR (ymn, ymx) r0
+        (z, r2) = randomR (zmn, zmx) r1
+    in  (V3 x y z, r2)
+
+randomUnitVec3 :: (Random a, Floating a, RandomGen g) => g -> (Vec3 a, g)
+randomUnitVec3 g
+    | length v > 1 = randomUnitVec3 g0
+    | otherwise    = (normalize v, g0)
+    where (v, g0) = randomVec3 (constVec (-1), constVec 1) g
+
+instance (Floating a, Random a) => Random (Vec3 a) where
+    randomR = randomVec3
+    random = randomUnitVec3
 
