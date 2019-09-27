@@ -18,7 +18,7 @@ import GHC.Float (float2Double)
 
 type PhotonMap = KdTree UArray Int Photon
 
-mkPhotonMap :: Int -> [Photon] -> PhotonMap
+mkPhotonMap :: [Photon] -> PhotonMap
 mkPhotonMap = mkKdTree
 
 -- struct photon {

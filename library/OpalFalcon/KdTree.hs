@@ -20,8 +20,8 @@ data AxisAlignedBoundingBox = AABB Vec3d Vec3d
 
 findAABB :: KdTreeObject b => [b] -> AxisAlignedBoundingBox
 findAABB [] = AABB origin origin
-findAABB x:[] = AABB x origin
-findAABB x:xs =
+findAABB (x:[]) = AABB (pos x) origin
+findAABB (l:ls) =
    let extrema = foldl (
         \(V3 (xMin, xMax) 
              (yMin, yMax) 
@@ -29,8 +29,8 @@ findAABB x:xs =
          (V3 x y z) -> V3 (min x xMin, max x xMax) 
                           (min y yMin, max y yMax) 
                           (min z zMin, max z zMax)) 
-         (pos x)
-         (map pos xs)
+         (fmap (\x -> (x,x)) $ pos l)
+         (map pos ls)
     in  AABB (fmap (\(mn,mx) -> (mn+mx)/2) extrema) (fmap (\(mn,mx) -> (mx-mn)/2) extrema)
 
 largestDimmension :: AxisAlignedBoundingBox -> KdAxis
@@ -61,7 +61,7 @@ balance points =
         let dim = largestDimmension $ findAABB points
             (med, l, r) = splitPoints dim points
         in case med of
-            Just m -> KdNode dim m (balance minSplit l) (balance minSplit r)
+            Just m -> KdNode dim m (balance l) (balance r)
             Nothing -> KdNull
 
 
