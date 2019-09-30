@@ -51,20 +51,6 @@ traceRay scene br ray =
 evaluateRayColor :: ColorRGBf -> ColorRGBf -> RtRay -> ColorRGBf
 evaluateRayColor i fallback ray = (rayColor ray) |*| (fromMaybe fallback (((i |*|) . (matDiffuseColor . hitMat)) <$> (rayHit ray)))
 
-genPixMap :: Integer -> Integer -> [(Integer, Integer)]
-genPixMap x2 y2 = [(x,y) | x <- [-x2..(x2-1)],
-                           y <- [-y2..(y2-1)] ]
-
-genRay :: Vec3d -> Double -> (Integer, Integer) -> Vec3d
-genRay cDir d (x,y) = normalize $ fromHomo $ applyTransform (lookAt cDir) $ toHomoPos $ normalize $ V3 (fromInteger x) (fromInteger y) (-d)
-
-genRays :: Integer -> Integer -> R.Ray -> Double -> [R.Ray]
-genRays w h (R.MkRay cPos cDir) fov = 
-    let w2 = shiftR w 1
-        h2 = shiftR h 1
-        d = (1 / (tan fov)) * (fromInteger h2)
-    in  map ((R.MkRay cPos) . (genRay cDir d)) $ genPixMap w2 h2
-
 rayTraceScene :: (ObjectCollection o) => Scene o -> Integer -> Integer -> R.Ray -> Double -> [ColorRGBf]
 rayTraceScene scene width height cameraRay fov = map (shootRay scene) $ genRays width height cameraRay fov
 

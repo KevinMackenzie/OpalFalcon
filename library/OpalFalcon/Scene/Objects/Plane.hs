@@ -16,11 +16,11 @@ newtype Plane = MkPlane VectorSpace
 
 -- Hittest that ignores backface hits
 hittestPlaneFront :: Plane -> PlaneMat -> Ray -> Maybe Hit
-hittestPlaneFront p@(MkPlane space) mat r@(MkRay _ rDir) = if ((zDir space) |.| rDir) > 0 then Nothing else hittestPlane p mat r
+hittestPlaneFront p@(MkPlane space) mat r@(Ray _ rDir) = if ((zDir space) |.| rDir) > 0 then Nothing else hittestPlane p mat r
 
 -- Hittests either side of a plane
 hittestPlane :: Plane -> PlaneMat -> Ray -> Maybe Hit
-hittestPlane plane@(MkPlane space) mat r@(MkRay rPos rDir) =
+hittestPlane plane@(MkPlane space) mat r@(Ray rPos rDir) =
     let pDir = zDir space
         pPos = spacePos space
         d = pDir |.| rDir

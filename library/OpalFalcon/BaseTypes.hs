@@ -57,7 +57,16 @@ data LightSource = MkLight { lightSample :: (Ray -> Maybe Hit) -> Vec3d -> Color
 --  of a hit for a specific object.  This lets us avoid having 
 --  general-purpose "hit UV" properties and material mappings
 data AppliedMaterial = MkAppMat { matDiffuseColor :: ColorRGBf
-                                , matApply :: Hit -> RtRay -> RtRay
+                                -- emittence in direction of ray; Note: to be replaced with global illumination
+                                , emittence :: Vec3d -> ColorRGBf
+                                -- TODO: This should be in frame of reference of normal
+                                -- TODO: normal is only one vector, we need 2 for anisotropy.  Do we add it to "Hit"?
+                                --        incoming outgoing reflectance
+                                , brdf :: Vec3d -> Vec3d -> ColorRGBf
+                                -- Modify distribution of random direction for importance sampling
+                                -- Note: This is a hemisphere, but may change for refraction
+                                --              incoming random   random (transformed)
+                                , importance :: Vec3d -> Vec3d -> Vec3d
                                 }
 instance Show AppliedMaterial where
     show m = show $ matDiffuseColor m

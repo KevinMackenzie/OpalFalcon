@@ -94,5 +94,8 @@ mkAffineSpace pos x y z = (V4 (toHomoDir x)
                         (toHomoDir z)
                         (toHomoPos pos))
 
+affineTranslate :: VectorSpace -> Vec3d
+affineTranslate (V4 _ _ _ p) = fromHomo p
+
 -- TODO: add ortho(normal), non-affine, and invertable space constructors
 

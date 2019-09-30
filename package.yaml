@@ -30,7 +30,6 @@ library:
   - JuicyPixels
   - random
   source-dirs: library
-  ghc-options: -Werror
 
 executables:
   OpalFalcon:
@@ -39,6 +38,7 @@ executables:
     dependencies:
     - base
     - OpalFalcon
+    - random
     ghc-options:
     - -rtsopts
     - -threaded

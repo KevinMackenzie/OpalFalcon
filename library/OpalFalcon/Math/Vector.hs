@@ -183,13 +183,19 @@ randomVec3 (V3 xmn ymn zmn, V3 xmx ymx zmx) g =
         (z, r2) = randomR (zmn, zmx) r1
     in  (V3 x y z, r2)
 
-randomUnitVec3 :: (Random a, Floating a, RandomGen g) => g -> (Vec3 a, g)
+randomUnitVec3 :: (Random a, Floating a, Ord a, RandomGen g) => g -> (Vec3 a, g)
 randomUnitVec3 g
-    | length v > 1 = randomUnitVec3 g0
-    | otherwise    = (normalize v, g0)
+    | mag v > 1 = randomUnitVec3 g0
+    | otherwise = (normalize v, g0)
     where (v, g0) = randomVec3 (constVec (-1), constVec 1) g
 
-instance (Floating a, Random a) => Random (Vec3 a) where
+instance (Random a, Floating a, Ord a) => Random (Vec3 a) where
     randomR = randomVec3
     random = randomUnitVec3
+
+-- Clamps randomly generated vectors into a hemisphere signified by a normal
+clampHemisphere :: (Floating a, Ord a) => Vec3 a -> Vec3 a -> Vec3 a
+clampHemisphere norm r
+            | norm |.| r > 0 = r
+            | otherwise      = negateVec r
 

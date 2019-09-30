@@ -4,7 +4,6 @@ module OpalFalcon.Material (
     ) where
 
 import OpalFalcon.Math.Vector
-import OpalFalcon.Math.Ray
 import OpalFalcon.BaseTypes
 
 -- TODO: this could be improved because we may have one material
@@ -12,37 +11,23 @@ import OpalFalcon.BaseTypes
 
 -- BSSRDF materials should require an object collection of light sources for each step
 
-reflectRayOverHit :: Hit -> Ray -> Ray
-reflectRayOverHit h r@(MkRay _ _) = MkRay (hitPos h) $ reflectRay r $ hitNorm h
-
--- Breaking constant accounts for "+1" that will follow this
-breakConst :: Integer
-breakConst = -2
-
-diffuseApply :: Hit -> RtRay -> RtRay
-diffuseApply h r = 
-    MkRtR { rayBase = reflectRayOverHit h $ rayBase r
-          , rayColor = rayColor r
-          , rayDepth = breakConst
-          , rayHit = rayHit r
-          }
+-- TODO: LEFT HERE: Change materials so their functions aren't complied applied, which means they do get the hit position and incoming direction, since this might not be convenient to derive in functions which construct these materials (i.e. SphereMat)  Then, the BRDF can assume its in frame-ofo-reference to the normal.
 
 -- Object with no reflectivity
-mkDiffuseMat :: ColorRGBf -> AppliedMaterial
-mkDiffuseMat dif = 
+mkDiffuseMat :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkDiffuseMat dif norm = 
     MkAppMat { matDiffuseColor = dif
-             , matApply = diffuseApply
+             , brdf = \_ _ -> (1/pi) *| dif
+             , importance = \_ -> id
+             , emittence = \_ -> V3 0 0 0.5
              }
 
 -- Simple material with a single reflective color
-mkSimpleMat :: ColorRGBf -> ColorRGBf -> AppliedMaterial
-mkSimpleMat dif refl = 
+mkSimpleMat :: ColorRGBf -> ColorRGBf -> Vec3d -> AppliedMaterial
+mkSimpleMat dif refl norm = 
     MkAppMat { matDiffuseColor = dif
-             , matApply = \h r ->
-                 MkRtR { rayBase = reflectRayOverHit h $ rayBase r
-                       , rayColor = (rayColor r) |*| refl
-                       , rayDepth = rayDepth r
-                       , rayHit = rayHit r
-                       }
+             , brdf = \_ _ -> refl
+             , importance = \inc _ -> reflect norm (negateVec inc)
+             , emittence = \_ -> black
              }
 

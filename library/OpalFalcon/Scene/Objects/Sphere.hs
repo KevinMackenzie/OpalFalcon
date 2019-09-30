@@ -1,7 +1,7 @@
 module OpalFalcon.Scene.Objects.Sphere (
     SphereMat,
     Sphere(MkSphere),
-    hittestSphere
+    hittestSphere,
     ) where
 
 import OpalFalcon.Math.Vector
@@ -44,7 +44,7 @@ filterNegativeParameters (p0, p1) =
 
 -- Basic Ray-sphere intersection: will return negative results
 getSphereParameters :: Sphere -> Ray -> (Maybe Double, Maybe Double)
-getSphereParameters (MkSphere space rad) (MkRay rPos rDir) = 
+getSphereParameters (MkSphere space rad) (Ray rPos rDir) = 
     let sPos = spacePos space
         newOrigin = rPos |-| sPos
         a = 1

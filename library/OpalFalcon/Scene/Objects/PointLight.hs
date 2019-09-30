@@ -13,7 +13,7 @@ data PointLight = MkPL Vec3d ColorRGBf Float
 
 samplePointLight :: PointLight -> (Ray -> Maybe Hit) -> Vec3d -> ColorRGBf
 samplePointLight (MkPL lPos lCol lPow) probe oPos = 
-    case probe $ MkRay lPos $ normalize $ oPos |-| lPos of
+    case probe $ Ray lPos $ normalize $ oPos |-| lPos of
         Nothing -> black
         Just h -> if (hitPos h) ~= oPos 
                       then lCol |* (realToFrac (attenuate (realToFrac lPow) lPos oPos)) 
