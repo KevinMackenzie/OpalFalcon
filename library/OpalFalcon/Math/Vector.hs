@@ -114,7 +114,12 @@ mutZ (V3 x y _) z = V3 x y z
 (*|) :: (Vector a, Num b) => b -> a b -> a b
 (*|) s = fmap (s*)
 (|*) :: (Vector a, Num b) => a b -> b -> a b
-(|*) v s = s *| v
+(|*) v s = fmap (*s) v
+-- Divide by scalar
+(/|) :: (Vector a, Fractional b) => b -> a b -> a b
+(/|) s = fmap (s/)
+(|/) :: (Vector a, Fractional b) => a b -> b -> a b
+(|/) v s = fmap (/s) v
 -- Dot product
 (|.|) :: (Vector a, Num b) => a b -> a b -> b
 (|.|) v0 v1 = foldr (+) 0 $ v0 |*| v1
@@ -145,6 +150,8 @@ vecAverage l =
     in  case len of
             0 -> origin
             _ -> (vecSum l) |* (1.0 / (fromInteger $ toInteger $ len))
+vecAvgComp :: (Vector a, Fractional b) => a b -> b
+vecAvgComp v = (foldl (+) 0 v) / (fromInteger $ toInteger $ length v)
 -- Normalize
 normalize :: (Vector a, Floating b) => a b -> a b
 normalize v = fmap ( / (mag v)) v

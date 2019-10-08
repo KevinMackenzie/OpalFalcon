@@ -28,15 +28,23 @@ import OpalFalcon.Math.Vector
 -- instance (RandomGen g) => Monad (Rng g) where
 --     (Rng g a) >>= f = Rng g (f a)
 
-tmap0 f (a, b) = (f a, b)
+-- TODO: eventually, the probability of reflecting a diffuse surface will depend on how
+--  diffuse it is.  Then consult global illumination.  Where do we draw the line between diffuse / specular.  Do we russian-roulette the eye-rays as well?
+--  becuase photons are collected on mostly specular surfaces as well and maybe we some
+--  material property that determines whether it should cosult global illumination or reflect, or maybe it does both all the time?
+--
+--  Maybe if we hit a high enough illuminence density on a hit, then we stop?  decaying exponentially with number of bounces
+
+-- The values we get back from these functions are HDR, but still should conserve energy, so we need to convert back to color space displays can handle (i.e. logorithmic, square root, linear)
 
 tracePath' :: RandomGen g => g -> (g -> Ray -> ColorRGBf) -> Vec3d -> Hit -> ColorRGBf
 tracePath' g c iDir h =
-    emit |+| ((c g' $ Ray (hitPos h) $ importance m iDir oDir) |*| refl |* angl)
+    emit |+| ((c g' $ Ray (hitPos h) oDir') |*| refl |* angl)
     where m    = hitMat h
           (oDir, g') = tmap0 (clampHemisphere norm) $ random g
-          refl = brdf m iDir oDir
-          emit = emittence m iDir
+          oDir'= importance m iDir oDir
+          refl = brdf m iDir oDir'
+          emit = emittence m iDir -- This will be handled by photon mapping
           norm = hitNorm h
           angl = double2Float $ (negateVec iDir) |.| norm -- Projected solid angle
 
@@ -48,7 +56,7 @@ tracePath :: (RandomGen g, ObjectCollection o) => g -> Scene o -> Integer -> Int
 tracePath g s md d r@(Ray _ iDir)
     | d >= md   = V3 1 0 1
     | otherwise = case (probeCollection (objects s) r) of
-                      Nothing -> V3 1 1 0
+                      Nothing -> V3 1 1 1
                       Just h  -> let recurse = (\g' -> tracePath g' s md (d+1))
                                  in  {-trace ("depth: " ++ (show d)) $-} tracePath' g recurse iDir h
 

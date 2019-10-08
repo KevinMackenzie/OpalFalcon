@@ -21,6 +21,10 @@ type PhotonMap = KdTree UArray Int Photon
 mkPhotonMap :: [Photon] -> PhotonMap
 mkPhotonMap = mkKdTree
 
+-- Makes a Photon from full-resolution types
+mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
+mkPhoton pos pow inc = undefined
+
 -- struct photon {
 --   float x,y,z;
 --   char p[4] ; (r, g, b, pow)
@@ -29,6 +33,7 @@ mkPhotonMap = mkKdTree
 -- } sizeof(photon) = 20
 -- TODO: Its probably OK to use Vec3s on photons.  Its ok if the lifted type isn't as space efficient
 --      as long as the array-form is since we'll need it in that form anyway and as long as its always strict
+--      It would be good to do all operations for photon map collection without lifting into photon types
 --                                   (x      y      z)  (rgb pow)  (phi   theta) flags
 data Photon = Photon {-# UNPACK #-} !Float !Float !Float !Word !Word deriving Show
 

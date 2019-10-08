@@ -110,3 +110,5 @@ maybeCompare f m0 m1 =
         (Just v, Nothing) -> Just v
         (Just h0, Just h1) -> if f h0 h1 then Just h0 else Just h1
 
+tmap0 :: (a -> b) -> (a, c) -> (b, c)
+tmap0 f (a, b) = (f a, b)
