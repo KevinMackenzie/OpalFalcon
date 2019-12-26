@@ -18,6 +18,7 @@ import OpalFalcon.Scene.Objects.Plane
 import OpalFalcon.Scene.Objects.Disc
 import OpalFalcon.Scene.Objects.PointLight
 import OpalFalcon.Photon.Photon
+import OpalFalcon.Photon.PhotonTracer
 import OpalFalcon.KdTree
 
 -- This is a test to see if we can get a simple rendering of a sphere
@@ -52,26 +53,13 @@ printHits hs = foldl (++) "\n" $ map (\x -> case x of Nothing -> ""
 main :: IO ()
 main = let w = 500
            h = 500
-           pixs = pathTraceScene (mkStdGen 0x1337dead) sc w h (Ray (V3 0 1 5) (normalize $ V3 0 (-0.2) (-1))) 90.0
-           -- grads = (map (\(x,y) -> V3 (fromInteger x) (fromInteger y) 0.0) (genPixMap 25 25))
-           -- hits = debugHits 0 sc 25 25 (V3 0 0 10) (V3 0 0 (-1)) 75.0
-           -- r0 = defaultRtRay $ Ray (V3 0 0 10) (V3 0 0 (-1))
-           -- h0 = probeCollection ol $ rayBase r0
-           -- r1 = fmap (deriveRay r0) h0
-           -- h1 = fmap ((probeCollection ol) . rayBase) r1
-           -- hitPlane = hittestPlane (MkPlane (Ray (V3 0 (-3) 0) (V3 0 1 0))) (Ray origin $ normalize (V3 0 (-1) (-1)))
-           -- ls = sampleLights (gray 0.1) sc $ V3 0 (-2) 0
-           px = tracePath (mkStdGen 0x1337dead) sc 2 0 (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1)))
+           -- pixs = pathTraceScene (mkStdGen 0x1337dead) sc w h (Ray (V3 0 1 5) (normalize $ V3 0 (-0.2) (-1))) 90.0
+           -- px = tracePath (mkStdGen 0x1337dead) sc 2 0 (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1)))
+           ph = shootPhoton sc (mkStdGen 0x1337dead) (EPhoton (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1))) (V3 1.0 0.0 0.0))
        in  do {
-           -- writeFile "outfile.ppm" $ encodePpm pixs 100 100;
-           saveToPng "pngfile.png" pixs w h;
-           -- writeFile "hittests.txt" $ printHits hits
-           -- print $ reflect (V3 0 0 1) (normalize (V3 0 1 1));
-           -- print $ reflectRay (Ray (V3 0 0 1) (V3 0 0 (-1))) (normalize (V3 1 1 1));
-           -- print $ closerPos (V3 0 0 0) (Just (V3 1 2 1)) (Just (V3 2 1 2));
-           -- print $ hittestSphere (MkSphere (V3 0 0 (-1)) 2) (Ray (V3 0 0 10) (V3 0 0 (-1)));
-           -- print $ objIntersectRay sph (Ray (V3 0 0 10) (V3 0 0 (-1)));
-           print px;
+           -- saveToPng "pngfile.png" pixs w h;
+           -- print px;
+           print ph;
            print "Uhhh"
            }
 

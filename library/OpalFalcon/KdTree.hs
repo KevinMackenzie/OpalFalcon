@@ -12,7 +12,7 @@ class KdTreeObject a where
     setAxis :: a -> KdAxis -> a
 
 -- Helper type to build the tree
-data KdAxis = XAxis | YAxis | ZAxis
+data KdAxis = XAxis | YAxis | ZAxis deriving Show
 data KdTreeTree d = KdNode KdAxis d (KdTreeTree d) (KdTreeTree d) | KdNull
 
 -- Box position with half-sizes in each dimmension

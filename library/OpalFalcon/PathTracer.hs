@@ -48,9 +48,6 @@ tracePath' g c iDir h =
           norm = hitNorm h
           angl = double2Float $ (negateVec iDir) |.| norm -- Projected solid angle
 
--- Since we do importance sampling, do we have to multi[ply by probability for sample -> i dont' think so...
--- Do we not factor in distence because this is a sampling method? -> i don't think so
-
 -- If other functions are going to need the RNG, then it would make sense to wrap it in a ST monad
 tracePath :: (RandomGen g, ObjectCollection o) => g -> Scene o -> Integer -> Integer -> Ray -> ColorRGBf
 tracePath g s md d r@(Ray _ iDir)
@@ -60,6 +57,7 @@ tracePath g s md d r@(Ray _ iDir)
                       Just h  -> let recurse = (\g' -> tracePath g' s md (d+1))
                                  in  {-trace ("depth: " ++ (show d)) $-} tracePath' g recurse iDir h
 
+-- Generates an infinite list of distinct random number generators
 randGens :: (RandomGen g) => g -> [g]
 randGens g = g':gs
              where (g', g'') = split g

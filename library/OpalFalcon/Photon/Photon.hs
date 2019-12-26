@@ -10,20 +10,44 @@ import System.Random
 
 import OpalFalcon.KdTree
 import Data.Array.Base
+import Data.Bits
 import GHC.Exts
-import Data.Bits ((.|.), (.&.), complement)
+import GHC.Word
 import GHC.ST (ST(..), runST)
 
-import GHC.Float (float2Double)
+import GHC.Float (float2Double, double2Float)
+
+-- Converts VecFs to VecDs
+float2DoubleVec :: (Vector a) => a Float -> a Double
+float2DoubleVec = fmap float2Double
+
+double2FloatVec :: (Vector a) => a Double -> a Float
+double2FloatVec = fmap double2Float
 
 type PhotonMap = KdTree UArray Int Photon
+
+-- Gets the estimated irradiance at a certain point in the photon map with a
+--  known surface normal, using a certain number of photons and only searching
+--  up to a maximum distance before giving up.
+estimateIrradiance :: PhotonMap -> Vec3d -> Vec3d -> Double -> Integer -> ColorRGBf
+estimateIrradiance pm pos norm maxDist pCount = whitef
+
+-- TODO: define global constants for sin/cos lookup tables for phi/theta
 
 mkPhotonMap :: [Photon] -> PhotonMap
 mkPhotonMap = mkKdTree
 
--- Makes a Photon from full-resolution types
+-- A photon that will evaluate its incoming direction strictly
+-- #TODO: this will always be used in haskell code
+data Photon = Photon !Vec3d !ColorRGBf !Vec3d !KdAxis deriving Show
+
 mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
-mkPhoton pos pow inc = undefined
+mkPhoton h c d = Photon h c d XAxis
+
+-- lift photon from packed representation
+-- liftPhoton :: Float# -> Float# -> Float# -> Word# -> Photon
+-- lower photon to packed representation
+-- lowerPhoton :: Photon -> !(# Float#, Float#, Float#, Word# #)
 
 -- struct photon {
 --   float x,y,z;
@@ -31,11 +55,10 @@ mkPhoton pos pow inc = undefined
 --   char phi, theta;
 --   short flag;
 -- } sizeof(photon) = 20
--- TODO: Its probably OK to use Vec3s on photons.  Its ok if the lifted type isn't as space efficient
---      as long as the array-form is since we'll need it in that form anyway and as long as its always strict
---      It would be good to do all operations for photon map collection without lifting into photon types
 --                                   (x      y      z)  (rgb pow)  (phi   theta) flags
-data Photon = Photon {-# UNPACK #-} !Float !Float !Float !Word !Word deriving Show
+-- data Photon# = Photon# {-# UNPACK #-} !Float !Float !Float !Word !Word deriving Show
+
+-- TODO: convert below functions to use lifted photon type, but we can define photon map operations with byte-hacking for better performance if we need to
 
 -- color :: Photon -> ColorRGBf
 -- color = undefined -- TODO: convert between shared-power form and floats
@@ -45,15 +68,14 @@ data Photon = Photon {-# UNPACK #-} !Float !Float !Float !Word !Word deriving Sh
 
 genPhoton :: IO (Photon)
 genPhoton = 
-        let rf = randomIO :: IO Float
-            rw = randomIO :: IO Word
+        let rp = randomIO :: IO Vec3d
+            ri = randomIO :: IO Vec3d
+            rc = randomIO :: IO ColorRGBf
         in  do {
-            x <- rf;
-            y <- rf;
-            z <- rf;
-            p <- rw;
-            f <- rw;
-            return $ Photon x y z (p .&. 0xFFFFFFFF) (f .&. 0xFFFFFFFF)
+            pos <- rp;
+            inc <- ri;
+            col <- rc;
+            return $ Photon pos col inc XAxis
             }
 
 genRandomPhotons :: Integer -> IO ([Photon])
@@ -65,49 +87,104 @@ genRandomPhotons n = if  n == 0 then return [] else do {
 
 
 blankPhoton :: Photon
-blankPhoton = Photon 0.0 0.0 0.0 0 0
+blankPhoton = Photon origin origin origin XAxis
 
-v3ToDouble :: Vec3 Float -> Vec3d
-v3ToDouble = fmap float2Double 
+unpackFlags :: Word -> KdAxis
+unpackFlags 1 = XAxis
+unpackFlags 2 = YAxis
+unpackFlags 3 = ZAxis
+unpackFlags _ = error "Photon axis value violated"
 
-setRawAxis :: KdAxis -> Word -> Word
-setRawAxis XAxis p = 1 .|. (p .&. (complement 7))
-setRawAxis YAxis p = 2 .|. (p .&. (complement 7))
-setRawAxis ZAxis p = 4 .|. (p .&. (complement 7))
+packFlags :: KdAxis -> Word
+packFlags XAxis = 1
+packFlags YAxis = 2
+packFlags ZAxis = 3
+packFlags _ = error "Photon axis value violated"
 
-getAxis :: Word -> KdAxis
-getAxis p = case p .&. 7 of
-    1 -> XAxis
-    2 -> YAxis
-    4 -> ZAxis
-    _ -> error "Photon axis value violated"
+packDir :: Vec3d -> Word
+packDir (V3 x y z) = 
+    let c2 = 256.0 / (2*pi)
+        phi = round $ c2 * (atan2 y x)
+        theta = round $ 2*c2*(acos z)
+    in phi .|. (shiftL theta 8)
+
+unpackDir :: Word -> Vec3d
+unpackDir w =
+    let c = pi / 256.0
+        phi = fromInteger (toInteger (w .&. 0xff))
+        theta = fromInteger (toInteger (shiftR (w .&. 0xff00) 8))
+        x = 2*c*(cos phi)
+        y = 2*c*(sin phi)
+        z = c*(tan theta)
+    in  V3 x y z
+
+-- Fast trig functions for 8 bit angle values
+-- cosTable :: Data.Array Int Float
+-- sinTable :: Data.Array Int Float
+-- fastCos :: Word# -> Float
+-- fastSin :: Word# -> Float
+-- fastCos (W# w) = cosTable V.!! w
+-- fastSin (W# w) = sinTable V.!! w
+
+-- Converts between theta,phi direction portion of the 4th 32 bits to a normalized vec3 and converts the flags portion
+unpackDirFlags :: Word -> (Vec3d, KdAxis)
+unpackDirFlags w = 
+    let dir = w .&. 0xffff
+        flags = shiftR (w .&. 0xffff0000) 16
+    in  (unpackDir dir, unpackFlags flags)
+packDirFlags :: Vec3d -> KdAxis -> Word
+packDirFlags dir axis = (shiftL (packFlags axis) 16) .|. (packDir dir)
+-- Converts between shared exponent color and separate exponent color
+unpackColor :: Word -> ColorRGBf
+unpackColor = undefined
+packColor :: ColorRGBf -> Word
+packColor = undefined
 
 instance KdTreeObject Photon where
     blank = blankPhoton
-    pos (Photon x y z _ _) = v3ToDouble $ V3 x y z
-    setAxis (Photon x y z p f) ax = Photon x y z p (setRawAxis ax f)
+    pos (Photon p _ _ _) = p
+    setAxis (Photon p c d _) ax = Photon p c d ax
 
-indexPhotonArray :: ByteArray# -> Int# -> Photon
-indexPhotonArray arr# idx# = 
-    Photon (ifa# 0#) (ifa# 1#) (ifa# 2#) (iwa# 3#) (iwa# 4#)
-    where ifa# i# = F# (indexFloatArray# arr# (idx# *# 5# +# i#))
-          iwa# i# = W# (indexWord32Array# arr# (idx# *# 5# +# i#))
+{-# INLINE indexPhotonArray# #-}
+indexPhotonArray# :: ByteArray# -> Int# -> Photon
+indexPhotonArray# arr# idx# = 
+    let ifa# i# = F# (indexFloatArray# arr# (idx# *# 5# +# i#))
+        iwa# i# = W# (indexWord32Array# arr# (idx# *# 5# +# i#))
+        x = ifa# 0#
+        y = ifa# 1#
+        z = ifa# 2#
+        col = iwa# 3#
+        (dir, axis) = unpackDirFlags $ iwa# 4#
+    in  Photon (float2DoubleVec $ V3 x y z)
+               (unpackColor col)
+               dir axis
 
+{-# INLINE readPhotonArray# #-}
 readPhotonArray# :: MutableByteArray# s -> Int# -> State# s -> (# State# s, Photon #) 
-readPhotonArray# arr# idx# st# = (# s5#, Photon (F# ifa0) (F# ifa1) (F# ifa2) (W# iwa3) (W# iwa4) #)
-    where !(# s1#, ifa0 #) = readFloatArray# arr# (idx# *# 5# +# 0#) st#
-          !(# s2#, ifa1 #) = readFloatArray# arr# (idx# *# 5# +# 1#) s1#
-          !(# s3#, ifa2 #) = readFloatArray# arr# (idx# *# 5# +# 2#) s2#
-          !(# s4#, iwa3 #) = readWord32Array# arr# (idx# *# 5# +# 3#) s3#
-          !(# s5#, iwa4 #) = readWord32Array# arr# (idx# *# 5# +# 4#) s4#
+readPhotonArray# arr# idx# st# = 
+    let offset = idx# *# 5#
+        !(# s1#, x #) = readFloatArray# arr# (offset +# 0#) st#
+        !(# s2#, y #) = readFloatArray# arr# (offset +# 1#) s1#
+        !(# s3#, z #) = readFloatArray# arr# (offset +# 2#) s2#
+        !(# s4#, col #) = readWord32Array# arr# (offset +# 3#) s3#
+        !(# s5#, dirFlags #) = readWord32Array# arr# (offset +# 4#) s4#
+        (dir, flags) = unpackDirFlags (W# dirFlags)
+    in  (# s5#, Photon (float2DoubleVec $ V3 (F# x) (F# y) (F# z)) 
+                       (unpackColor (W# col))
+                       dir flags #)
 
+{-# INLINE writePhotonArray# #-}
 writePhotonArray# :: MutableByteArray# s -> Int# -> Photon -> State# s -> State# s
-writePhotonArray# arr# idx# (Photon (F# x) (F# y) (F# z) (W# p) (W# f)) s0# =
-    let s1# = writeFloatArray# arr# (idx# *# 5# +# 0#) x s0#;
-        s2# = writeFloatArray# arr# (idx# *# 5# +# 1#) y s1#;
-        s3# = writeFloatArray# arr# (idx# *# 5# +# 2#) z s2#;
-        s4# = writeWord32Array# arr# (idx# *# 5# +# 3#) p s3#;
-        s5# = writeWord32Array# arr# (idx# *# 5# +# 4#) f s4#;
+writePhotonArray# arr# idx# (Photon pos col dir flags) s0# =
+    let !(V3 !(F# x) !(F# y) !(F# z)) = double2FloatVec pos
+        offset = idx# *# 5#
+        !(W# col#) = packColor col
+        !(W# df) = packDirFlags dir flags
+        s1# = writeFloatArray# arr# (offset +# 0#) x s0#
+        s2# = writeFloatArray# arr# (offset +# 1#) y s1#
+        s3# = writeFloatArray# arr# (offset +# 2#) z s2#
+        s4# = writeWord32Array# arr# (offset +# 3#) col# s3#
+        s5# = writeWord32Array# arr# (offset +# 4#) df s4#
     in  s5#
 
 instance MArray (STUArray s) Photon (ST s) where
@@ -136,7 +213,7 @@ instance IArray UArray Photon where
     {-# INLINE unsafeArray #-}
     unsafeArray lu ies = runST (unsafeArrayUArray lu ies blankPhoton)
     {-# INLINE unsafeAt #-}
-    unsafeAt (UArray _ _ _ arr#) (I# i#) = indexPhotonArray arr# i#
+    unsafeAt (UArray _ _ _ arr#) (I# i#) = indexPhotonArray# arr# i#
     {-# INLINE unsafeReplace #-}
     unsafeReplace arr ies = runST (unsafeReplaceUArray arr ies)
     {-# INLINE unsafeAccum #-}
