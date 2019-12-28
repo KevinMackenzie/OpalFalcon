@@ -11,6 +11,7 @@ data Camera
   = Camera
       { cameraPos :: Vec3d,
         cameraDir :: Vec3d,
+        cameraUp :: Vec3d, -- must not be collinear with 'dir'
         cameraFOV :: Double, -- Horizontal FOV in radians
         cameraAspect :: Double -- Aspect ratio of frame (w/h)
       }
@@ -38,14 +39,16 @@ cameraRay c = Ray (cameraPos c) (cameraDir c)
 
 -- Generates the view-matrix for the camera
 cameraViewTransform :: Camera -> Matrix4d
-cameraViewTransform cam = (translate (negateVec cp)) ||*|| (lookAtFromPos cp cd)
+cameraViewTransform cam = (translate (negateVec cp)) ||*|| (lookAtCam (cp |-| cd) cu) -- Flip the order of the args so the negative 'z' direction is forward (what we want for rendering)
   where
     cp = cameraPos cam
     cd = cameraDir cam
+    cu = cameraUp cam
 
 -- Generates the projection-matrix for the camera
+-- Use 1.0 as the near-plane so the result is normalized
 cameraProjTransform :: Camera -> Matrix4d
-cameraProjTransform cam = perspective 0.1 1000.0 (cameraFOV cam)
+cameraProjTransform cam = perspective 1.0 10000.0 (cameraFOV cam)
 
 -- Generates the transform from normalized screen space to pixel-space
 cameraPixelTransform :: Camera -> Integer -> Matrix4d

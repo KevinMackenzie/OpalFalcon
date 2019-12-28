@@ -66,6 +66,9 @@ tests:
     - OpalFalcon
     - tasty
     - tasty-hspec
+    - HUnit
+    - deepseq
+    - call-stack
     ghc-options:
     - -rtsopts
     - -threaded

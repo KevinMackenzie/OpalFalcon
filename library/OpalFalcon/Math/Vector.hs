@@ -27,7 +27,7 @@ vecZip = liftA2
 
 -- Approximately equal to with default epsilon
 (~=) :: (Vector a, Ord b, Fractional b) => a b -> a b -> Bool
-(~=) = approxEq 0.00001
+(~=) = approxEq 0.00001 -- TODO: should this scale based on the exponent of the two floats?
 
 -- Used to see if two vectors are approximately equal to 
 --  handle floating-point errors
