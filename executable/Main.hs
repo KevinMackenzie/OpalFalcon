@@ -66,6 +66,3 @@ main = let w = 500
            print phs;
            print "Uhhh"
            }
-
--- TODO: uhh, write some fucking tests.  That's how you debug FP
-

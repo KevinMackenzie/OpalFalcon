@@ -13,14 +13,17 @@ class (Foldable a, Applicative a) => Vector a where {}
 constVec :: Vector a => b -> a b
 constVec = pure
 
+vecZip :: Vector a => (b -> c -> d) -> a b -> a c -> a d
+vecZip = liftA2
+
 -- Arithmetic operations on vectors
 (|+|) :: (Vector a, Num b) => a b -> a b -> a b
 (|-|) :: (Vector a, Num b) => a b -> a b -> a b
 (|*|) :: (Vector a, Num b) => a b -> a b -> a b
 
-(|+|) = liftA2 (+)
-(|-|) = liftA2 (-)
-(|*|) = liftA2 (*)
+(|+|) = vecZip (+)
+(|-|) = vecZip (-)
+(|*|) = vecZip (*)
 
 -- Approximately equal to with default epsilon
 (~=) :: (Vector a, Ord b, Fractional b) => a b -> a b -> Bool
