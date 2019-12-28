@@ -5,6 +5,7 @@ module OpalFalcon.Math.Vector where
 import Data.Word (Word8)
 import Control.Applicative(Applicative, (<*>), liftA2)
 import System.Random (Random(..), RandomGen)
+import GHC.Float (float2Double, double2Float)
 
 -- Base typeclasses
 class (Foldable a, Applicative a) => Vector a where {}
@@ -162,12 +163,15 @@ clamp = liftA2 (\x y -> if x < y then x else y)
 (|><|) :: (Num a) => (Vec3 a) -> (Vec3 a) -> (Vec3 a)
 (|><|) (V3 a1 a2 a3) (V3 b1 b2 b3) = (V3 (a2*b3-a3*b2) (a3*b1-a1*b3) (a1*b2-a2*b1))
 
+-- TODO: dynamic range...?
 toPixel :: ColorRGBf -> ColorRGB
 toPixel = fmap (round . (255*))
 
 -- Functions for converting vectors to and from homogeneous coords
 fromHomo :: (Fractional a) => Vec4 a -> Vec3 a
 fromHomo (V4 x y z w) = V3 (x/w) (y/w) (z/w)
+fromHomoDir :: Vec4 a -> Vec3 a
+fromHomoDir = demote4
 toHomo :: (Num a) => Vec3 a -> a -> Vec4 a
 toHomo (V3 x y z) w = (V4 x y z w)
 toHomoPos :: (Num a) => Vec3 a -> Vec4 a
@@ -206,3 +210,17 @@ clampHemisphere norm r
             | norm |.| r > 0 = r
             | otherwise      = negateVec r
 
+-- N-dimmensional gaussian kernel (0-centered)
+gaussianOrigin :: (Floating a, Vector b) => b a -> a -> a
+gaussianOrigin x sig = (1 / ((sqrt 2*pi)*sig)^(length x)) * (exp (-(mag x)^2) / (2*sig^2))
+
+-- N-dimmensional gaussian kernel (arbitrary center)
+gaussian :: (Floating a, Vector b) => b a -> b a -> a -> a
+gaussian x p sig = gaussianOrigin (x |-| p) sig
+
+-- Converts VecFs to VecDs
+float2DoubleVec :: (Vector a) => a Float -> a Double
+float2DoubleVec = fmap float2Double
+
+double2FloatVec :: (Vector a) => a Double -> a Float
+double2FloatVec = fmap double2Float

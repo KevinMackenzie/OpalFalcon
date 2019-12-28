@@ -20,6 +20,8 @@ import OpalFalcon.Scene.Objects.PointLight
 import OpalFalcon.Photon.Photon
 import OpalFalcon.Photon.PhotonTracer
 import OpalFalcon.KdTree
+import OpalFalcon.Scene.Camera
+import OpalFalcon.Photon.Visualizer
 
 -- This is a test to see if we can get a simple rendering of a sphere
 -- TODO: we need a way to save the results to a file (do ppm for now)
@@ -55,11 +57,13 @@ main = let w = 500
            h = 500
            -- pixs = pathTraceScene (mkStdGen 0x1337dead) sc w h (Ray (V3 0 1 5) (normalize $ V3 0 (-0.2) (-1))) 90.0
            -- px = tracePath (mkStdGen 0x1337dead) sc 2 0 (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1)))
-           ph = shootPhoton sc (mkStdGen 0x1337dead) (EPhoton (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1))) (V3 1.0 0.0 0.0))
+           (Just ph) = shootPhoton sc (mkStdGen 0x1337dead) (EPhoton (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1))) (V3 1.0 0.0 0.0))
+           phs = renderPhotons' sc (Camera { cameraPos = V3 0 1 5, cameraDir = normalize $ V3 0 (-0.2) (-1), cameraFOV = 90, cameraAspect = 1 }) h [ph]
        in  do {
            -- saveToPng "pngfile.png" pixs w h;
            -- print px;
            print ph;
+           print phs;
            print "Uhhh"
            }
 

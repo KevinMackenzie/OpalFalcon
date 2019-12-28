@@ -15,15 +15,6 @@ import GHC.Exts
 import GHC.Word
 import GHC.ST (ST(..), runST)
 
-import GHC.Float (float2Double, double2Float)
-
--- Converts VecFs to VecDs
-float2DoubleVec :: (Vector a) => a Float -> a Double
-float2DoubleVec = fmap float2Double
-
-double2FloatVec :: (Vector a) => a Double -> a Float
-double2FloatVec = fmap double2Float
-
 type PhotonMap = KdTree UArray Int Photon
 
 -- Gets the estimated irradiance at a certain point in the photon map with a
