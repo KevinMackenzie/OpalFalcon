@@ -50,8 +50,9 @@ cullPhoton cam (Photon pos _ _ _) = cameraClipPoint cam pos
 -- Rasters photon in pixel-space to output pixels
 -- TODO: this only affects the pixel the photon is it.  It should use the gaussian
 rasterPhoton :: Int -> (STArray s Int ColorRGBf) -> Photon -> ST s ()
-rasterPhoton w pxs (Photon (V3 x y _) pPow _ _) = do
-  writeArray pxs ((\(V2 x y) -> (y * w + x)) $ fmap (fromInteger . floor) (V2 x y)) whitef
+rasterPhoton w pxs (Photon (V3 x y _) pPow _ _) =
+  let idx = ((\(V2 x' y') -> (y' * w + x')) $ fmap (fromInteger . floor) (V2 x y))
+   in do curr <- readArray pxs idx; writeArray pxs idx (pPow |+| curr)
 
 toSTArray :: (Ix i) => Array i e -> ST s (STArray s i e)
 toSTArray arr = newListArray (bounds arr) (elems arr)
