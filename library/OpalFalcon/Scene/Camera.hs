@@ -1,6 +1,7 @@
 module OpalFalcon.Scene.Camera where
 
 import Data.Array
+import Debug.Trace
 import OpalFalcon.Math.Matrix
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
@@ -23,6 +24,9 @@ data FrameBuffer
         fbHeight :: Int,
         fbData :: Array Int ColorRGBf
       }
+
+fbPixelList :: FrameBuffer -> [ColorRGBf]
+fbPixelList fb = elems (fbData fb)
 
 fbUpdate :: FrameBuffer -> [(Vec2i, ColorRGBf)] -> FrameBuffer
 fbUpdate fb a = fbAccum (\_ v -> v) fb a
@@ -50,9 +54,15 @@ cameraViewTransform cam = (translate (negateVec cp)) ||*|| (lookAtCam (cp |-| cd
 cameraProjTransform :: Camera -> Matrix4d
 cameraProjTransform cam = perspective 1.0 10000.0 (cameraFOV cam)
 
--- Generates the transform from normalized screen space to pixel-space
+-- Returns True if the point is in the viewing space of the camera (post-projection)
+cameraClipPoint :: Camera -> Vec3d -> Bool
+cameraClipPoint cam (V3 x y z) = z >= 0 && z <= 1 && x >= (- a2) && x <= (a2) && y >= (-0.5) && y <= 0.5
+  where
+    a2 = (cameraAspect cam) / 2
+
+-- Generates the transform from normalized 0-centred screen space to pixel-space (lower-left is origin)
 cameraPixelTransform :: Camera -> Integer -> Matrix4d
-cameraPixelTransform _ height = scaleUniform (fromInteger height)
+cameraPixelTransform cam height = (scaleUniform (fromInteger height)) ||*|| (translate (V3 ((cameraAspect cam) / 2) 0.5 0))
 
 -- Generates a blank frame buffer
 cameraFrameBlank :: Camera -> Integer -> FrameBuffer
@@ -60,7 +70,7 @@ cameraFrameBlank c height =
   FB
     { fbHeight = fromInteger height,
       fbWidth = fromInteger w,
-      fbData = listArray (0, l) [black :: ColorRGBf | _ <- [0, l]]
+      fbData = listArray (0, l) [black :: ColorRGBf | _ <- [0 .. l]]
     }
   where
     l = fromInteger $ height * w

@@ -23,7 +23,7 @@ location = case reverse callStack of
   (_, loc) : _ -> Just loc
   [] -> Nothing
 
--- See docs for `assertEqual`
+-- Like `assertEqual`, but it works with vector approximately-equal
 assertApproxEqual preface var expected actual =
   unless (approxEq var actual expected) $ do
     (prefaceMsg `deepseq` expectedMsg `deepseq` actualMsg `deepseq` E.throwIO (HUnitFailure location $ ExpectedButGot prefaceMsg expectedMsg actualMsg))
@@ -104,7 +104,7 @@ cameraSpec :: Spec
 cameraSpec = parallel $ do
   describe "Camera" $ do
     describe "Trasformations" $ do
-      it "rotates correctly" $
+      it "rotate" $
         let cam0 = Camera
               { cameraPos = origin,
                 cameraDir = (V3 0 0 (-1)),
@@ -123,7 +123,7 @@ cameraSpec = parallel $ do
          in do
               ((applyTransform3 (cameraViewTransform cam0) obj0) `shouldBe` obj0)
               ((applyTransform3 (cameraViewTransform cam1) obj0) `shouldBeApprox` (V3 0 0.5 (- (sqrt 2) / 2)))
-      it "translates correctly" $
+      it "translate" $
         let cam0 = Camera
               { cameraPos = V3 0 0 1,
                 cameraDir = (V3 0 0 (-1)),
@@ -134,8 +134,7 @@ cameraSpec = parallel $ do
             obj0 = V3 0 0 (-1)
          in do
               ((applyTransform3 (cameraViewTransform cam0) obj0) `shouldBe` (V3 0 0 (-2)))
-    describe "Projection" $ do
-      it "projects correctly" $
+      it "perspective projection" $
         let cam0 = Camera
               { cameraPos = V3 0 0 1,
                 cameraDir = (V3 0 0 (-1)),
@@ -150,3 +149,17 @@ cameraSpec = parallel $ do
          in do
               ((tf obj0) `shouldBeApprox` (V3 0 0 0))
               ((tf obj1) `shouldBeApprox` (V3 0 (-1) 0))
+      it "image/pixel-space" $
+        let cam0 = Camera
+              { cameraPos = V3 0 0 1,
+                cameraDir = (V3 0 0 (-1)),
+                cameraUp = V3 0 1 0,
+                cameraFOV = deg2Rad 90,
+                cameraAspect = 16 / 9
+              }
+            tf = applyTransform3 (cameraPixelTransform cam0 1080)
+            obj0 = V3 0 0 0
+            obj1 = V3 (-0.25) (-0.25) 0
+         in do
+              ((tf obj0) `shouldBe` (V3 (1920 / 2) (1080 / 2) 0))
+              ((tf obj1) `shouldBe` (V3 690 270 0))
