@@ -41,7 +41,7 @@ renderPhotons sc cam px phs = rasterPhotons (cameraFrameBlank cam px) $ renderPh
 
 -- Returns True if there is an unobstructed path from the photon to a point
 occludePhoton :: (ObjectCollection o) => Scene o -> Vec3d -> Photon -> Bool
-occludePhoton sc cp (Photon p _ _ _) = True -- isNothing $ probeCollection (objects sc) (Ray p (normalize (cp |-| p)))
+occludePhoton sc cp (Photon p _ _ _) = isNothing $ probeCollection (objects sc) (Ray p (normalize (cp |-| p)))
 
 -- Returns True if the photon is in view of the camera
 cullPhoton :: Camera -> Photon -> Bool
