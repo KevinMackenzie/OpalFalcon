@@ -23,8 +23,6 @@ type PhotonMap = KdTree UArray Int Photon
 estimateIrradiance :: PhotonMap -> Vec3d -> Vec3d -> Double -> Integer -> ColorRGBf
 estimateIrradiance pm pos norm maxDist pCount = whitef
 
--- TODO: define global constants for sin/cos lookup tables for phi/theta
-
 mkPhotonMap :: [Photon] -> PhotonMap
 mkPhotonMap = mkKdTree
 
@@ -35,27 +33,12 @@ data Photon = Photon !Vec3d !ColorRGBf !Vec3d !KdAxis deriving Show
 mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
 mkPhoton h c d = Photon h c d XAxis
 
--- lift photon from packed representation
--- liftPhoton :: Float# -> Float# -> Float# -> Word# -> Photon
--- lower photon to packed representation
--- lowerPhoton :: Photon -> !(# Float#, Float#, Float#, Word# #)
-
 -- struct photon {
 --   float x,y,z;
 --   char p[4] ; (r, g, b, pow)
 --   char phi, theta;
 --   short flag;
 -- } sizeof(photon) = 20
---                                   (x      y      z)  (rgb pow)  (phi   theta) flags
--- data Photon# = Photon# {-# UNPACK #-} !Float !Float !Float !Word !Word deriving Show
-
--- TODO: convert below functions to use lifted photon type, but we can define photon map operations with byte-hacking for better performance if we need to
-
--- color :: Photon -> ColorRGBf
--- color = undefined -- TODO: convert between shared-power form and floats
--- 
--- incDir :: Photon -> (Word8, Word8)
--- incDir (Photon _ _ _ _ f) = ((shiftR 24 f) .&. 0xFF, (shiftR 16 f) .&. 0xFF)
 
 genPhoton :: IO (Photon)
 genPhoton = 

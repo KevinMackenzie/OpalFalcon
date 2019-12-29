@@ -39,6 +39,7 @@ executables:
     - base
     - OpalFalcon
     - random
+    - array
     ghc-options:
     - -rtsopts
     - -threaded
