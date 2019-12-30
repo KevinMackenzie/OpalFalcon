@@ -4,8 +4,6 @@ import Control.Monad.ST
 import Data.Array
 import Data.Array.ST
 import Data.Maybe
-import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Lighting
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
@@ -31,8 +29,7 @@ renderPhotons' sc cam px phs =
       tf s (Photon pPos pPow pDir pFlags) =
         let nPos = fromHomo $ s $ toHomoPos pPos
             nDir = fromHomoDir $ s $ toHomoDir pDir
-            nPow = double2FloatVec $ attenuateVec (float2DoubleVec pPow) pPos $ cameraPos cam
-         in Photon nPos nPow nDir pFlags
+         in Photon nPos pPow nDir pFlags
       phs' = filter (occludePhoton sc (cameraPos cam)) phs
    in map (tf postCull) $ filter (cullPhoton cam) $ map (tf preCull) phs'
 

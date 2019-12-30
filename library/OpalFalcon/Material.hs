@@ -13,16 +13,16 @@ import OpalFalcon.BaseTypes
 
 -- TODO: LEFT HERE: Change materials so their functions aren't complied applied, which means they do get the hit position and incoming direction, since this might not be convenient to derive in functions which construct these materials (i.e. SphereMat)  Then, the BRDF can assume its in frame-ofo-reference to the normal.
 
--- Object with no reflectivity
+-- Material with purely diffuse reflectivity
 mkDiffuseMat :: ColorRGBf -> Vec3d -> AppliedMaterial
 mkDiffuseMat dif norm = 
     MkAppMat { matDiffuseColor = dif
-             , brdf = \_ _ -> (1/pi) *| dif
+             , brdf = \_ _ -> dif
              , importance = \_ -> id
              , emittence = \_ -> V3 0 0 0.5
              }
 
--- Simple material with a single reflective color
+-- Material with purely specular reflectivity
 mkSimpleMat :: ColorRGBf -> ColorRGBf -> Vec3d -> AppliedMaterial
 mkSimpleMat dif refl norm = 
     MkAppMat { matDiffuseColor = dif

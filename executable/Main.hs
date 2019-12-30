@@ -46,7 +46,7 @@ cornellBox = MkScene
     diffT d t _ = mkDiffuseMat d (normalize $ triangleNorm t)
     leftMat = diffT (V3 0.95 0.2 0.2)
     rightMat = diffT (V3 0.2 0.95 0.2)
-    blankMat = diffT (V3 0.7 0.7 0.7)
+    blankMat = diffT (V3 0.2 0.2 0.2)
     left0 = mkTriangleObject (MkTriangle vlbf vlbb vltb) leftMat
     left1 = mkTriangleObject (MkTriangle vlbf vltb vltf) leftMat
     right0 = mkTriangleObject (MkTriangle vrbf vrtb vrbb) rightMat
@@ -137,17 +137,11 @@ main =
   let w = 500
       h = 500
       -- pixs = pathTraceScene (mkStdGen 0x1337dead) sc w h (Ray (V3 0 1 5) (normalize $ V3 0 (-0.2) (-1))) 90.0
-      -- px = tracePath (mkStdGen 0x1337dead) sc 2 0 (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1)))
-      -- (Just ph) = shootPhoton sc (mkStdGen 0x1337dead) (EPhoton (Ray (V3 0 1 5) (normalize $ V3 (-0.1) 0 (-1))) (V3 10.0 0.0 0.0))
-      phs = spherePhotonShoot cornellBox (100 *| whitef) 300000 (V3 0 0 0)
-      cam = Camera {cameraPos = V3 0 0 5, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 90, cameraAspect = 1}
+      -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
+      phs = spherePhotonShoot cornellBox (constVec 0.05) 300000 (V3 0 0 0)
+      cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 90, cameraAspect = 1}
       fb = renderPhotons cornellBox cam h phs
-   in -- sphPts = spherePoints 31 10 3 (V3 0 0 2)
-      -- fakePhs = map (\x -> Photon x whitef origin XAxis) sphPts
-      -- fakeFb = renderPhotons sc cam h fakePhs
-      do
+   in do
         -- saveToPngRtr "pngfile.png" pixs w h;
+        -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" phs;
         saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
--- saveToPngPmap "pmap.png" (fbPixelList fakeFb) (fbWidth fakeFb) (fbHeight fakeFb);
--- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" sphPts;
--- print px;
