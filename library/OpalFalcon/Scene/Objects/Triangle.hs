@@ -29,7 +29,7 @@ triangleNorm (MkTriangle v0 v1 v2) = (v1 |-| v0) |><| (v2 |-| v0)
 hittestTriangleFront :: Triangle -> TriangleMat -> Ray -> Maybe Hit
 hittestTriangleFront t mat r@(Ray _ rDir) = if ((triangleNorm t) |.| rDir) > 0 then Nothing else hittestTriangle t mat r
 
--- Hittests either side of a triangle
+-- Hittests either side of a triangle:  TODO: this doesn't work for back-face intersection
 -- https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution
 hittestTriangle :: Triangle -> TriangleMat -> Ray -> Maybe Hit
 hittestTriangle t@(MkTriangle v0 v1 v2) mat r@(Ray rPos rDir) =
@@ -38,7 +38,8 @@ hittestTriangle t@(MkTriangle v0 v1 v2) mat r@(Ray rPos rDir) =
       a2 = mag n' -- cross product is the half-area
       d = n |.| v0 -- the constant offset of the implicit plane function
       dDir = n |.| rDir
-      p = ((n |.| rPos) + d) / dDir
+      dPos = n |.| rPos
+      p = -(dPos - d) / dDir -- NOTE: This differs from the above implementation
       hPos = pointAtParameter r p
       vc0 = (v1 |-| v0) |><| (hPos |-| v0)
       vc1 = (v2 |-| v1) |><| (hPos |-| v1)

@@ -9,11 +9,15 @@ import Control.DeepSeq
 import Control.Exception as E
 import Control.Monad
 import Data.CallStack
+import Data.Maybe
+import OpalFalcon.BaseTypes
 import OpalFalcon.Math
 import OpalFalcon.Math.Matrix
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
+import OpalFalcon.Math.Ray
 import OpalFalcon.Scene.Camera
+import OpalFalcon.Scene.Objects.Triangle
 import Test.HUnit.Lang
 import qualified Test.Tasty
 import Test.Tasty.Hspec
@@ -42,7 +46,8 @@ main = do
   matrixTests <- testSpec "OpalFalcon.Math.Matrix" matrixSpec
   transformationsTests <- testSpec "OpalFalcon.Math.Transformations" transformationsSpec
   cameraTests <- testSpec "OpalFalcon.Scene.Camera" cameraSpec
-  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [vectorTests, matrixTests, transformationsTests, cameraTests]
+  triangleTests <- testSpec "OpalFalcon.Scene.Objects.Triangle" triangleSpec
+  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests]
 
 -- Only test non-trivial operations on vectors
 vectorSpec :: Spec
@@ -163,3 +168,45 @@ cameraSpec = parallel $ do
          in do
               ((tf obj0) `shouldBe` (V3 (1920 / 2) (1080 / 2) 0))
               ((tf obj1) `shouldBe` (V3 690 270 0))
+
+triangleSpec :: Spec
+triangleSpec =
+  describe "Triangle" $ do
+    describe "Intersection" $
+      let t0 = MkTriangle (V3 (-1) (-1) (-2)) (V3 1 0 (-2)) (V3 0 1 (-2))
+          tmat t _ = undefined
+       in do
+            it "hits front-face (from +z)" $
+              let r = Ray (V3 0 0 1) (V3 0 0 (-1))
+                  mh = hittestTriangle t0 tmat r
+                  hit = fromJust mh
+               in do
+                    ((isJust mh) `shouldBe` True)
+                    ((hitParam hit) `shouldBe` 3)
+                    ((hitPos hit) `shouldBe` (V3 0 0 (-2)))
+                    ((hitNorm hit) `shouldBe` zAxis)
+                    ((hitInc hit) `shouldBe` r)
+            it "hits front-face (from -z)" $
+              let r = Ray (V3 0 0 (-1)) (V3 0 0 (-1))
+                  mh = hittestTriangle t0 tmat r
+                  hit = fromJust mh
+               in do
+                    ((isJust mh) `shouldBe` True)
+                    ((hitParam hit) `shouldBe` 1)
+                    ((hitPos hit) `shouldBe` (V3 0 0 (-2)))
+                    ((hitNorm hit) `shouldBe` zAxis)
+                    ((hitInc hit) `shouldBe` r)
+            it "hits back-face" $
+              let r = Ray (V3 0 0 (-5)) (V3 0 0 1)
+                  mh = hittestTriangle t0 tmat r
+                  hit = fromJust mh
+               in do
+                    ((isJust mh) `shouldBe` True)
+                    ((hitParam hit) `shouldBe` 3)
+                    ((hitPos hit) `shouldBe` (V3 0 0 (-2)))
+                    ((hitNorm hit) `shouldBe` zAxis)
+                    ((hitInc hit) `shouldBe` r)
+            it "misses back-face" $
+              let mh = hittestTriangleFront t0 tmat (Ray (V3 0 0 (-5)) (V3 0 0 1))
+               in do
+                    ((isNothing mh) `shouldBe` True)
