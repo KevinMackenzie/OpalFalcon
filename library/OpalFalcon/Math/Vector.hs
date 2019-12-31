@@ -141,6 +141,8 @@ demote3 (V3 x y _) = V2 x y
 -- Distance function
 distance :: (Vector a, Floating b) => a b -> a b -> b
 distance v0 v1 = mag $ v0 |-| v1
+distance2 :: (Vector a, Num b) => a b -> a b -> b
+distance2 v0 v1 = foldl (+) 0 $ fmap (^2) $ v0 |-| v1
 -- Magnitude
 mag :: (Vector a, Floating b) => a b -> b
 mag v = sqrt $ foldr (+) 0 $ v |*| v
@@ -168,7 +170,7 @@ clamp = liftA2 (\x y -> if x < y then x else y)
 
 -- TODO: dynamic range...?
 toPixel :: ColorRGBf -> ColorRGB
-toPixel = fmap (round . (255*))
+toPixel = fmap ((min 255) . round . (255*))
 
 -- Functions for converting vectors to and from homogeneous coords
 fromHomo :: (Fractional a) => Vec4 a -> Vec3 a
