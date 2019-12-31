@@ -140,7 +140,7 @@ main =
       -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
       phs = spherePhotonShoot cornellBox (constVec 0.05) 300000 (V3 0 0 0)
       cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 90, cameraAspect = 1}
-      fb = renderPhotons cornellBox cam h phs
+      fb = renderPhotons cornellBox cam h $ kdTreeElems $ ((mkKdTree phs) :: PhotonMap)
    in do
         -- saveToPngRtr "pngfile.png" pixs w h;
         -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" phs;

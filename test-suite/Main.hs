@@ -47,12 +47,13 @@ shouldBeApprox a e = assertApproxEqual "" 0.001 e a
 main :: IO ()
 main = do
   kdTreeTests <- testSpec "OpalFalcon.KdTree" kdTreeSpec
+  photonTests <- testSpec "OpalFalcon.Photon.Photon" photonSpec
   vectorTests <- testSpec "OpalFalcon.Math.Vector" vectorSpec
   matrixTests <- testSpec "OpalFalcon.Math.Matrix" matrixSpec
   transformationsTests <- testSpec "OpalFalcon.Math.Transformations" transformationsSpec
   cameraTests <- testSpec "OpalFalcon.Scene.Camera" cameraSpec
   triangleTests <- testSpec "OpalFalcon.Scene.Objects.Triangle" triangleSpec
-  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [kdTreeTests, vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests]
+  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [kdTreeTests, photonTests, vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests]
 
 -- Only test non-trivial operations on vectors
 vectorSpec :: Spec
@@ -249,3 +250,23 @@ kdTreeSpec =
     it "heap orders" $
       let l = origin : [V3 x y z | x <- [(-0.2), 0.2], y <- [(-0.3), 0.3], z <- [(-0.4), 0.4]] :: [Vec3d]
        in do ((kdTreeElems $ ((mkKdTree l) :: BoxedKdTree Vec3d)) `shouldBe` [V3 0.0 0.0 0.0, V3 (-0.2) 0.3 (-0.4), V3 (-0.2) 0.3 0.4, V3 0.2 (-0.3) (-0.4), V3 0.2 0.3 (-0.4), V3 0.2 (-0.3) 0.4, V3 0.2 0.3 0.4, V3 (-0.2) (-0.3) (-0.4), V3 (-0.2) (-0.3) 0.4])
+
+photonSpec :: Spec
+photonSpec =
+  describe "Photon" $ do
+    describe "Packing" $ do
+      it "Color Packing" $
+        let color = V3 0.5 0.4 0.3
+            packed = 0x7c019a9a
+         in do
+              ((packColor color) `shouldBe` packed)
+              ((unpackColor packed) `shouldBeApprox` color)
+      it "Dir Flags Packing" $ 
+        let dir = normalize $ V3 0.5 0.4 0.2
+            flags = YAxis
+            packed = 0x29b67
+            (d', f') = unpackDirFlags packed
+         in do 
+            ((packDirFlags dir flags) `shouldBe` packed)
+            (f' `shouldBe` flags)
+            (assertApproxEqual "" 0.01 dir d')

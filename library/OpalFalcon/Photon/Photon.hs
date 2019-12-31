@@ -78,18 +78,22 @@ packFlags _ = error "Photon axis value violated"
 packDir :: Vec3d -> Word
 packDir (V3 x y z) = 
     let c2 = 256.0 / (2*pi)
-        phi = round $ c2 * (atan2 y x)
-        theta = round $ 2*c2*(acos z)
-    in phi .|. (shiftL theta 8)
+        theta' = atan2 y x
+        phi' = acos z
+        theta = round $ c2 * theta' + 128
+        phi = round $ 2*c2 * phi'
+     in phi .|. (shiftL theta 8)
 
 unpackDir :: Word -> Vec3d
 unpackDir w =
     let c = pi / 256.0
-        phi = fromInteger (toInteger (w .&. 0xff))
-        theta = fromInteger (toInteger (shiftR (w .&. 0xff00) 8))
-        x = 2*c*(cos phi)
-        y = 2*c*(sin phi)
-        z = c*(tan theta)
+        theta' = fromIntegral $ (shiftR w 8) .&. 0xff
+        theta = 2*c*(theta'-128)
+        phi' = fromIntegral $ w .&. 0xff
+        phi = c*phi'
+        x = (sin phi) * (cos theta)
+        y = (sin phi) * (sin theta)
+        z = cos phi
     in  V3 x y z
 
 -- Fast trig functions for 8 bit angle values
@@ -109,10 +113,28 @@ unpackDirFlags w =
 packDirFlags :: Vec3d -> KdAxis -> Word
 packDirFlags dir axis = (shiftL (packFlags axis) 16) .|. (packDir dir)
 -- Converts between shared exponent color and separate exponent color
+-- (see https://www.khronos.org/registry/OpenGL/extensions/EXT/EXT_texture_shared_exponent.txt)
 unpackColor :: Word -> ColorRGBf
-unpackColor = undefined
+unpackColor w = 
+    let n = 9 :: Int
+        b = 15 :: Int
+        col_p = fmap fromIntegral $ V3 (shiftR (w .&. 0x7ffffff) 18) (shiftR (w .&. 0x3ffff) 9) (w .&. 0x1ff)
+        exp_p = fromIntegral $ shiftR w 27
+     in fmap (\x -> (fromIntegral x) * 2^^(exp_p- b - n)) col_p
 packColor :: ColorRGBf -> Word
-packColor = undefined
+packColor col = 
+    let n = 9 :: Int
+        emax = 31 :: Int
+        b = 15 :: Int
+        sharedexp_max = (2^n-1)/(2^n) * (2^(emax-b))
+        col_c = (fmap (\x -> max 0 $ min sharedexp_max x) col)
+        max_c = foldl max 0 col_c
+        exp_shared_p = (max (-b-1) $ floor (logBase 2 max_c)) + 1 + b
+        max_s = floor $ max_c / (2^^(exp_shared_p - b - n)) + 0.5
+        exp_shared = exp_shared_p + (if max_s < 2^n then 0 else 1)
+        (V3 rs gs bs) = fmap (\x -> floor $ x / (2**(fromIntegral $ exp_shared - b - n)) + 0.5) col_c
+    in  fromIntegral $ bs .|. (shiftL gs 9) .|. (shiftL rs 18) .|. (shiftL exp_shared 27)
+
 
 instance KdTreeObject Photon where
     blank = blankPhoton
