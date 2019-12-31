@@ -12,6 +12,8 @@ module OpalFalcon.KdTree
     kdTreeElems,
     sortByDim,
     splitPoints,
+    kdTreeSize,
+    axisElem
   )
 where
 
@@ -64,6 +66,11 @@ largestDimmension (AABB _ (V3 xs ys zs)) =
     then if xs > zs then XAxis else ZAxis
     else if ys > zs then YAxis else ZAxis
 
+axisElem :: KdAxis -> Vec3 a -> a
+axisElem XAxis (V3 v _ _) = v
+axisElem YAxis (V3 _ v _) = v
+axisElem ZAxis (V3 _ _ v) = v
+
 sortByFunc :: KdTreeObject a => KdAxis -> a -> a -> Ordering
 sortByFunc XAxis o0 o1 = compare (xPos $ pos o0) (xPos $ pos o1)
 sortByFunc YAxis o0 o1 = compare (yPos $ pos o0) (yPos $ pos o1)
@@ -105,10 +112,15 @@ data KdTree arr ix d = KdTree (arr ix d) deriving (Show)
 type BoxedKdTree e = KdTree Array Int e
 
 mkKdTree :: (IArray arr a, KdTreeObject a) => [a] -> KdTree arr Int a
-mkKdTree l = KdTree $ listArray (0 :: Int, (length l) -1) $ (treeToList $ balance l)
+mkKdTree l = KdTree $ listArray (1 :: Int, length l) $ treeToList $ balance l
 
 mkKdTree1 :: (IArray arr a, KdTreeObject a) => [a] -> KdTree arr Int a
-mkKdTree1 l = KdTree $ listArray (0 :: Int, (length l) -1) $ l
+mkKdTree1 l = KdTree $ listArray (1 :: Int, length l) $ l
 
 kdTreeElems :: (IArray arr a, Ix i) => KdTree arr i a -> [a]
 kdTreeElems (KdTree a) = elems a
+
+kdTreeSize :: (IArray arr a, Ix i) => KdTree arr i a -> i
+kdTreeSize (KdTree a) =
+  let (_, l) = bounds a
+   in l

@@ -120,17 +120,13 @@ spherePoints lonSteps latSteps radius pos =
       phi <- [(n * 2 * pi / lonSteps) | n <- [1 .. (lonSteps -1)]]
   ]
 
-randomSpherePoints g =
-  let (v, g') = randomUnitVec3 g
-   in v : (randomSpherePoints g')
-
 -- Filters the Nothing values out of a list
 filterJust :: [Maybe a] -> [a]
 filterJust [] = []
 filterJust ((Nothing) : xs) = filterJust xs
 filterJust ((Just x) : xs) = x : (filterJust xs)
 
-spherePhotonShoot sc pow cnt pos = filterJust $ map (\(d, r) -> shootPhoton sc r (EPhoton (Ray pos d) pow)) $ zip (take cnt $ randomSpherePoints $ mkStdGen 0xdeadbeef) $ randGens $ mkStdGen 0x1337dead
+spherePhotonShoot sc pow cnt pos = filterJust $ map (\(d, r) -> shootPhoton sc r (EPhoton (Ray pos d) pow)) $ zip (take cnt $ randoms $ mkStdGen 0xdeadbeef) $ randGens $ mkStdGen 0x1337dead
 
 main :: IO ()
 main =
@@ -140,8 +136,15 @@ main =
       -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
       phs = spherePhotonShoot cornellBox (constVec 0.05) 300000 (V3 0 0 0)
       cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 90, cameraAspect = 1}
-      fb = renderPhotons cornellBox cam h $ kdTreeElems $ ((mkKdTree phs) :: PhotonMap)
+      pmap = (mkKdTree phs) :: PhotonMap
+      (phs',cnt) = collectPhotons pmap 30000 (V3 (-2) 0 0) 2
+      (phs1,cnt1) = collectPhotons pmap 30000 (V3 0 0 (-2)) 2
+      (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
+      fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
    in do
         -- saveToPngRtr "pngfile.png" pixs w h;
-        -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" phs;
+        print cnt
+        print cnt1
+        print cnt2
+        -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
         saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)

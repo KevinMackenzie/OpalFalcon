@@ -5,9 +5,15 @@
 module OpalFalcon.Photon.Photon where
 
 import OpalFalcon.Math.Vector
+import OpalFalcon.Math
+import OpalFalcon.Photon.STHeap
 
 import System.Random
 
+import Control.Monad
+import Data.Array.ST
+import Control.Monad.ST
+import Data.STRef
 import OpalFalcon.KdTree
 import Data.Array.Base
 import Data.Bits
@@ -32,6 +38,35 @@ data Photon = Photon !Vec3d !ColorRGBf !Vec3d !KdAxis deriving Show
 
 mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
 mkPhoton h c d = Photon h c d XAxis
+
+indexPhotonMap :: PhotonMap -> Int -> Photon
+indexPhotonMap (KdTree pmap) i = pmap ! i
+
+-- TODO: we will want an option that lets us get an irradiance estimate without converting to a list
+collectPhotons :: PhotonMap -> Int -> Vec3d -> Double -> ([Photon],Int)
+collectPhotons pmap n x maxDist = 
+    let pmapSize = kdTreeSize pmap
+        recurse p heap d2 = 
+            let ph@(Photon pos pow dir axis) = indexPhotonMap pmap p
+                l = recurse (2*p) heap d2
+                r = recurse (2*p+1) heap d2
+                del = (axisElem axis x) - (axisElem axis pos)
+                del2 = distance2 x pos
+            in do
+                when (2*p+1 < pmapSize) $ do
+                    if del < 0
+                        then do l;r
+                        else do r;l
+                d2Val <- readSTRef d2
+                when (del2 < d2Val) $ do
+                    pushHeap ph heap
+                    (Photon rp _ _ _) <- getHeapRoot heap
+                    writeSTRef d2 $ distance2 rp x
+     in runST $ do
+        heap <- mkSTHeap n (Photon (constVec 10000) origin origin XAxis) (\(Photon x' _ _ _) -> 1 / (distance2 x x'))
+        d2 <- newSTRef maxDist
+        recurse 1 heap d2
+        getHeapContents heap
 
 -- struct photon {
 --   float x,y,z;
