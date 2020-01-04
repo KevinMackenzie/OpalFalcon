@@ -35,7 +35,7 @@ hittestTriangle :: Triangle -> TriangleMat -> Ray -> Maybe Hit
 hittestTriangle t@(MkTriangle v0 v1 v2) mat r@(Ray rPos rDir) =
   let n' = triangleNorm t
       n = normalize n'
-      a2 = mag n' -- cross product is the half-area
+      a2 = mag n' -- cross product is the double-area
       d = n |.| v0 -- the constant offset of the implicit plane function
       dDir = n |.| rDir
       dPos = n |.| rPos

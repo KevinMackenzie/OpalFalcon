@@ -48,12 +48,13 @@ main :: IO ()
 main = do
   kdTreeTests <- testSpec "OpalFalcon.KdTree" kdTreeSpec
   photonTests <- testSpec "OpalFalcon.Photon.Photon" photonSpec
+  photonCollectionTests <- testSpec "OpalFalcon.Photon.Photon.Collection" photonCollectionSpec
   vectorTests <- testSpec "OpalFalcon.Math.Vector" vectorSpec
   matrixTests <- testSpec "OpalFalcon.Math.Matrix" matrixSpec
   transformationsTests <- testSpec "OpalFalcon.Math.Transformations" transformationsSpec
   cameraTests <- testSpec "OpalFalcon.Scene.Camera" cameraSpec
   triangleTests <- testSpec "OpalFalcon.Scene.Objects.Triangle" triangleSpec
-  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [kdTreeTests, photonTests, vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests]
+  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [kdTreeTests, photonTests, photonCollectionTests, vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests]
 
 -- Only test non-trivial operations on vectors
 vectorSpec :: Spec
@@ -261,12 +262,69 @@ photonSpec =
          in do
               ((packColor color) `shouldBe` packed)
               ((unpackColor packed) `shouldBeApprox` color)
-      it "Dir Flags Packing" $ 
+      it "Dir Flags Packing" $
         let dir = normalize $ V3 0.5 0.4 0.2
             flags = YAxis
             packed = 0x29b67
             (d', f') = unpackDirFlags packed
-         in do 
-            ((packDirFlags dir flags) `shouldBe` packed)
-            (f' `shouldBe` flags)
-            (assertApproxEqual "" 0.01 dir d')
+         in do
+              ((packDirFlags dir flags) `shouldBe` packed)
+              (f' `shouldBe` flags)
+              (assertApproxEqual "" 0.01 dir d')
+
+photonCollectionSpec :: Spec
+photonCollectionSpec =
+  describe "Photon Collection" $ do
+    it "insideEdge" $ do
+      ((insideEdge origin xAxis yAxis zAxis) `shouldBe` True)
+      ((insideEdge origin xAxis (negateVec yAxis) zAxis) `shouldBe` False)
+    it "lstPairs" $ do
+      (lstPairs [xAxis, yAxis, zAxis]) `shouldBe` [(xAxis, yAxis), (yAxis, zAxis), (zAxis, xAxis)]
+    it "insertRemovePoint" $
+      let pt0 = V3 1 (-1) 0
+          pt1 = V3 1 1 0
+          pt2 = V3 (-1) 1 0
+          pt3 = V3 (-1) (-1) 0
+          hull =
+            [ (pt0, pt1),
+              (pt1, pt2),
+              (pt2, pt3),
+              (pt3, pt0)
+            ]
+          ipt = V3 0 2 0
+          hullModified =
+            [ (pt0, pt1),
+              (pt1, ipt),
+              (ipt, pt2),
+              (pt2, pt3),
+              (pt3, pt0)
+            ]
+       in do
+            ((insertPoint hull origin zAxis) `shouldBe` hull)
+            ((insertPoint hull ipt zAxis) `shouldBe` hullModified)
+    it "Convex Hull" $
+      let points = [V3 x y 0 | x <- [(-1) .. 1], y <- [(-1) .. 1]] ++ hullPoints
+          hullPoints =
+            [ V3 2 2 0,
+              V3 2 (-2) 0,
+              V3 1 (-3) 0,
+              V3 1 3 0,
+              V3 (-2) 2 0,
+              V3 (-2) (-2) 0,
+              V3 (-1) (-3) 0,
+              V3 (-1) 3 0
+            ]
+          norm = zAxis
+          hullPointsOrdered =
+            [ V3 1 (-3) 0,
+              V3 2 (-2) 0,
+              V3 2 2 0,
+              V3 1 3 0,
+              V3 (-1) 3 0,
+              V3 (-2) 2 0,
+              V3 (-2) (-2) 0,
+              V3 (-1) (-3) 0
+            ]
+       in do
+            ((fmap fst $ convexHull points zAxis) `shouldBe` hullPointsOrdered)
+            ((convexHullArea points zAxis) `shouldBe` Just 22)
