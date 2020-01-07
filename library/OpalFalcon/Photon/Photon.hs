@@ -55,7 +55,7 @@ lstPairs :: [a] -> [(a,a)]
 lstPairs l@(h:_) = lstPairs' h l
 
 insideEdge :: Vec3d -> Vec3d -> Vec3d -> Vec3d -> Bool
-insideEdge p0 p1 pt norm = ((p1 |-| p0) |><| (pt |-| p0)) |.| norm > 0
+insideEdge p0 p1 pt norm = ((p1 |-| p0) |><| (pt |-| p0)) |.| norm >= 0
 -- A set of functions that adds a point to a convex hull
 removePoint :: [(Vec3d, Vec3d)] -> Vec3d -> Vec3d -> Vec3d -> [(Vec3d, Vec3d)]
 removePoint [] p2 pt _ = [(pt,p2)]
