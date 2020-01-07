@@ -46,7 +46,7 @@ cornellBox = MkScene
     diffT d t _ = mkDiffuseMat d (normalize $ triangleNorm t)
     leftMat = diffT (V3 0.95 0.2 0.2)
     rightMat = diffT (V3 0.2 0.95 0.2)
-    blankMat = diffT (V3 0.2 0.2 0.2)
+    blankMat = diffT (V3 0.7 0.7 0.7)
     left0 = mkTriangleObject (MkTriangle vlbf vlbb vltb) leftMat
     left1 = mkTriangleObject (MkTriangle vlbf vltb vltf) leftMat
     right0 = mkTriangleObject (MkTriangle vrbf vrtb vrbb) rightMat
@@ -128,23 +128,24 @@ filterJust ((Just x) : xs) = x : (filterJust xs)
 
 spherePhotonShoot sc pow cnt pos = filterJust $ map (\(d, r) -> shootPhoton sc r (EPhoton (Ray pos d) pow)) $ zip (take cnt $ randoms $ mkStdGen 0xdeadbeef) $ randGens $ mkStdGen 0x1337dead
 
+globIllum :: PhotonMap -> Int -> Double -> Vec3d -> Vec3d -> Vec3d -> (Vec3d -> Vec3d -> ColorRGBf) -> ColorRGBf
+globIllum pmap pcount maxDist pos inc norm brdf = estimateIrradiance pmap pcount pos inc maxDist brdf norm
+
 main :: IO ()
 main =
-  let w = 500
-      h = 500
-      -- pixs = pathTraceScene (mkStdGen 0x1337dead) sc w h (Ray (V3 0 1 5) (normalize $ V3 0 (-0.2) (-1))) 90.0
+  let w = 100
+      h = 100
+      -- pixs = pathTraceScene (globIllum pmap 200 0.1) (mkStdGen 0x1337beef) cornellBox cam h
+      pixs = renderIlluminance (globIllum pmap 150 0.5) cornellBox cam h
       -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
-      phs = spherePhotonShoot cornellBox (constVec 0.05) 300000 (V3 0 0 0)
-      cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 90, cameraAspect = 1}
+      phs = spherePhotonShoot cornellBox (constVec 0.5) 30000 (V3 0 0 0)
+      cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 75, cameraAspect = 1}
       pmap = (mkKdTree phs) :: PhotonMap
-      (phs',cnt) = collectPhotons pmap 30000 (V3 (-2) 0 0) 2
-      (phs1,cnt1) = collectPhotons pmap 30000 (V3 0 0 (-2)) 2
-      (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
-      fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
+      -- (phs',cnt) = collectPhotons pmap 30000 (V3 (-2) 0 0) 2
+      -- (phs1,cnt1) = collectPhotons pmap 30000 (V3 0 0 (-2)) 2
+      -- (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
+      -- fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
    in do
-        -- saveToPngRtr "pngfile.png" pixs w h;
-        print cnt
-        print cnt1
-        print cnt2
         -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
-        saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
+        -- saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
+        saveToPngRtr "pngfile.png" pixs w h;

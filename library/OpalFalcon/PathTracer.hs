@@ -6,6 +6,7 @@ import Debug.Trace
 
 import System.Random
 
+import OpalFalcon.Scene.Camera
 import OpalFalcon.BaseTypes
 import OpalFalcon.Scene
 import OpalFalcon.RayTraceUtils
@@ -37,25 +38,28 @@ import OpalFalcon.Math.Vector
 
 -- The values we get back from these functions are HDR, but still should conserve energy, so we need to convert back to color space displays can handle (i.e. logorithmic, square root, linear)
 
-tracePath' :: RandomGen g => g -> (g -> Ray -> ColorRGBf) -> Vec3d -> Hit -> ColorRGBf
-tracePath' g c iDir h =
+--                 pos      incDir   norm      brdf
+type GlobalIllum = Vec3d -> Vec3d -> Vec3d -> (Vec3d -> Vec3d -> ColorRGBf) -> ColorRGBf
+
+tracePath' :: RandomGen g => GlobalIllum -> g -> (g -> Ray -> ColorRGBf) -> Vec3d -> Hit -> ColorRGBf
+tracePath' glob g c iDir h =
     emit |+| ((c g' $ Ray (hitPos h) oDir') |*| refl |* angl)
     where m    = hitMat h
           (oDir, g') = tmap0 (clampHemisphere norm) $ random g
           oDir'= importance m iDir oDir
           refl = brdf m iDir oDir'
-          emit = emittence m iDir -- This will be handled by photon mapping
+          emit = glob (hitPos h) iDir norm (brdf m)
           norm = hitNorm h
           angl = double2Float $ (negateVec iDir) |.| norm -- Projected solid angle
 
 -- If other functions are going to need the RNG, then it would make sense to wrap it in a ST monad
-tracePath :: (RandomGen g, ObjectCollection o) => g -> Scene o -> Integer -> Integer -> Ray -> ColorRGBf
-tracePath g s md d r@(Ray _ iDir)
+tracePath :: (RandomGen g, ObjectCollection o) => GlobalIllum -> g -> Scene o -> Integer -> Integer -> Ray -> ColorRGBf
+tracePath glob g s md d r@(Ray _ iDir)
     | d >= md   = V3 1 0 1
     | otherwise = case (probeCollection (objects s) r) of
                       Nothing -> V3 1 1 1
-                      Just h  -> let recurse = (\g' -> tracePath g' s md (d+1))
-                                 in  {-trace ("depth: " ++ (show d)) $-} tracePath' g recurse iDir h
+                      Just h  -> let recurse = (\g' -> tracePath glob g' s md (d+1))
+                                 in  {-trace ("depth: " ++ (show d)) $-} tracePath' glob g recurse iDir h
 
 -- Generates an infinite list of distinct random number generators
 randGens :: (RandomGen g) => g -> [g]
@@ -63,8 +67,8 @@ randGens g = g':gs
              where (g', g'') = split g
                    gs = randGens g''
 
-pathTraceScene :: (RandomGen g, ObjectCollection o) => g -> Scene o -> Integer -> Integer -> Ray -> Double -> [ColorRGBf]
-pathTraceScene g scene width height cameraRay fov = 
-    map (\(g', r) -> tracePath g' scene 5 0 r) $
-        zip (randGens g) $ genRays width height cameraRay fov
+pathTraceScene :: (RandomGen g, ObjectCollection o) => GlobalIllum -> g -> Scene o -> Camera -> Int -> [ColorRGBf]
+pathTraceScene glob g scene cam height = 
+    map (\(g', r) -> tracePath glob g' scene 2 0 r) $
+        zip (randGens g) $ genRays (floor $ (cameraAspect cam) * (fromIntegral height)) (toInteger height) (cameraRay cam) (cameraFOV cam)
 

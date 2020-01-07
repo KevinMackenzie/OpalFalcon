@@ -1,13 +1,17 @@
 module OpalFalcon.Photon.Visualizer where
 
 import Control.Monad.ST
+import Debug.Trace
 import Data.Array
 import Data.Array.ST
 import Data.Maybe
+import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
+import OpalFalcon.PathTracer
 import OpalFalcon.Photon.Photon
+import OpalFalcon.RayTraceUtils
 import OpalFalcon.Scene
 import OpalFalcon.Scene.Camera
 
@@ -68,3 +72,13 @@ rasterPhotons frame phs =
       fbHeight = fbHeight frame,
       fbData = runSTArray $ rasterPhotons' (fbWidth frame) (fbData frame) phs
     }
+
+renderIlluminance :: (ObjectCollection o) => GlobalIllum -> Scene o -> Camera -> Int -> [ColorRGBf]
+renderIlluminance glob scene cam height =
+  let shoot r =
+        case probeCollection (objects scene) r of
+          Nothing -> black
+          Just h -> trace (show c) $ c |/ 250
+            where
+              c = glob (hitPos h) (negateVec $ dir $ hitInc h) (hitNorm h) (brdf $ hitMat h)
+   in map shoot $ genRays (floor $ (cameraAspect cam) * (fromIntegral height)) (toInteger height) (cameraRay cam) (cameraFOV cam)
