@@ -126,19 +126,19 @@ filterJust [] = []
 filterJust ((Nothing) : xs) = filterJust xs
 filterJust ((Just x) : xs) = x : (filterJust xs)
 
-spherePhotonShoot sc pow cnt pos = filterJust $ map (\(d, r) -> shootPhoton sc r (EPhoton (Ray pos d) pow)) $ zip (take cnt $ randoms $ mkStdGen 0xdeadbeef) $ randGens $ mkStdGen 0x1337dead
+spherePhotonShoot sc pow cnt pos = filterJust $ map (\(d, r) -> shootPhoton 1 0 sc r (EPhoton (Ray pos d) (pow |/ (fromIntegral cnt)))) $ zip (take cnt $ randoms $ mkStdGen 0xdeadbeef) $ randGens $ mkStdGen 0x1337dead
 
 globIllum :: PhotonMap -> Int -> Double -> Vec3d -> Vec3d -> Vec3d -> (Vec3d -> Vec3d -> ColorRGBf) -> ColorRGBf
-globIllum pmap pcount maxDist pos inc norm brdf = estimateIrradiance pmap pcount pos inc maxDist brdf norm
+globIllum pmap pcount maxDist pos inc norm brdf = estimateRadiance pmap pcount pos inc maxDist brdf norm
 
 main :: IO ()
 main =
   let w = 100
       h = 100
       -- pixs = pathTraceScene (globIllum pmap 200 0.1) (mkStdGen 0x1337beef) cornellBox cam h
-      pixs = renderIlluminance (globIllum pmap 150 0.5) cornellBox cam h
+      pixs = renderIlluminance (globIllum pmap 150 1.0) cornellBox cam h
       -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
-      phs = spherePhotonShoot cornellBox (constVec 0.5) 30000 (V3 0 0 0)
+      phs = spherePhotonShoot cornellBox (constVec 50) 30000 (V3 0 0 0)
       cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 75, cameraAspect = 1}
       pmap = (mkKdTree phs) :: PhotonMap
       -- (phs',cnt) = collectPhotons pmap 30000 (V3 (-2) 0 0) 2

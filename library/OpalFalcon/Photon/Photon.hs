@@ -5,6 +5,7 @@
 module OpalFalcon.Photon.Photon where
 
 import OpalFalcon.Math.Vector
+import qualified OpalFalcon.Math.Transformations as TF
 import OpalFalcon.Math
 import OpalFalcon.Photon.STHeap
 
@@ -24,17 +25,28 @@ import GHC.ST (ST(..), runST)
 
 type PhotonMap = KdTree UArray Int Photon
 
--- Gets the estimated irradiance at a certain point in the photon map with a
+cullCylinder:: Vec3d -> Double -> Double -> Vec3d -> Vec3d -> Bool
+-- cullCylinder _ _ _ _ _ = False
+cullCylinder dir r h pos x 
+    | (distance2 pos x) > (r*r) = True
+    | (abs $ (x |-| pos) |.| dir) > h = True
+    | otherwise = False
+
+-- Gets the estimated radiance at a certain point in the photon map with a
 --  known surface normal, using a certain number of photons and only searching
 --  up to a maximum distance before giving up.
-estimateIrradiance :: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> (Vec3d -> Vec3d -> ColorRGBf) -> Vec3d -> ColorRGBf
-estimateIrradiance pmap pCount hpos incDir maxDist brdf norm = 
-    let (photons, cnt) = collectPhotons pmap pCount hpos maxDist
+estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> (Vec3d -> Vec3d -> ColorRGBf) -> Vec3d -> ColorRGBf
+estimateRadiance pmap pCount hpos incDir maxDist brdf norm = 
+    let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.01*maxDist) hpos) hpos maxDist
         pts = map (\(Photon pos _ _ _) -> pos) photons
+        r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
+        -- area = Just $ pi*r2
         area = double2Float <$> convexHullArea pts norm
-     in case area of
+        r = case area of
             Nothing -> black -- No area means no photons or not enough
             Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (brdf inc incDir)) |+| c) black photons)
+      in r
+
 
 -- Finds the area of the convex hull containing all photons
 convexHullArea :: [Vec3d] -> Vec3d -> Maybe Double
@@ -99,9 +111,9 @@ mkPhoton h c d = Photon h c d XAxis
 indexPhotonMap :: PhotonMap -> Int -> Photon
 indexPhotonMap (KdTree pmap) i = pmap ! i
 
--- TODO: we will want an option that lets us get an irradiance estimate without converting to a list
-collectPhotons :: PhotonMap -> Int -> Vec3d -> Double -> ([Photon],Int)
-collectPhotons pmap n x maxDist = 
+-- TODO: we will want an option that lets us get a radiance estimate without converting to a list
+collectPhotons :: PhotonMap -> Int -> (Vec3d -> Bool) -> Vec3d -> Double -> ([Photon],Int)
+collectPhotons pmap n cull x maxDist = 
     let pmapSize = kdTreeSize pmap
         recurse p heap d2 = 
             let ph@(Photon pos pow dir axis) = indexPhotonMap pmap p
@@ -115,13 +127,15 @@ collectPhotons pmap n x maxDist =
                         then do l;r
                         else do r;l
                 d2Val <- readSTRef d2
-                when (del2 < d2Val) $ do
+                when (del2 < d2Val && (not $ cull pos)) $ do
                     pushHeap ph heap
-                    (Photon rp _ _ _) <- getHeapRoot heap
-                    writeSTRef d2 $ distance2 rp x
+                    hSize <- getHeapSize heap
+                    when (hSize == n) $ do
+                        (Photon rp _ _ _) <- getHeapRoot heap
+                        writeSTRef d2 $ distance2 rp x
      in runST $ do
-        heap <- mkSTHeap n (Photon (constVec 10000) origin origin XAxis) (\(Photon x' _ _ _) -> 1 / (distance2 x x'))
-        d2 <- newSTRef maxDist
+        heap <- mkSTHeap n (Photon origin origin origin XAxis) (\(Photon x' _ _ _) -> distance2 x x')
+        d2 <- newSTRef (maxDist*maxDist)
         recurse 1 heap d2
         getHeapContents heap
 

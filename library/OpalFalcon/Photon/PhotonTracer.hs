@@ -11,9 +11,10 @@ import System.Random
 data EmissivePhoton = EPhoton !Ray !ColorRGBf
 
 -- Uses russian roulette to shoot a photon through the scene
-bouncePhoton :: (RandomGen g) => (g -> EmissivePhoton -> Maybe Photon) -> g -> EmissivePhoton -> Hit -> Maybe Photon
-bouncePhoton shoot g (EPhoton (Ray _ prDir) pCol) hit
+bouncePhoton :: (RandomGen g) => Int -> Int -> (g -> EmissivePhoton -> Maybe Photon) -> g -> EmissivePhoton -> Hit -> Maybe Photon
+bouncePhoton minBounces depth shoot g (EPhoton (Ray _ prDir) pCol) hit
   | r < reflAvg = shoot g'' $ EPhoton (Ray hPos oDir) $ pCol |*| (refl |/ reflAvg)
+  | minBounces > depth = Nothing
   | otherwise = Just $ mkPhoton hPos pCol iDir
   where
     m = hitMat hit
@@ -25,5 +26,5 @@ bouncePhoton shoot g (EPhoton (Ray _ prDir) pCol) hit
     (r, g'') = random g'
 
 -- Traces a photon through the scene using russian-roulette based on BRDF for material
-shootPhoton :: (RandomGen g, ObjectCollection o) => Scene o -> g -> EmissivePhoton -> Maybe Photon
-shootPhoton scene g ph@(EPhoton r _) = (probeCollection (objects scene) r) >>= (bouncePhoton (shootPhoton scene) g ph)
+shootPhoton :: (RandomGen g, ObjectCollection o) => Int -> Int -> Scene o -> g -> EmissivePhoton -> Maybe Photon
+shootPhoton minBounces depth scene g ph@(EPhoton r _) = (probeCollection (objects scene) r) >>= (bouncePhoton minBounces depth (shootPhoton minBounces (depth+1) scene) g ph)

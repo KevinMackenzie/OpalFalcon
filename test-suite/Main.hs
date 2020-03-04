@@ -12,6 +12,8 @@ import Control.Exception as E
 import Control.Monad
 import Data.CallStack
 import Data.Maybe
+import Data.STRef
+import GHC.ST (ST (..), runST)
 import OpalFalcon.BaseTypes
 import OpalFalcon.KdTree
 import OpalFalcon.Math
@@ -20,6 +22,7 @@ import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
 import OpalFalcon.Photon.Photon
+import OpalFalcon.Photon.STHeap
 import OpalFalcon.Scene.Camera
 import OpalFalcon.Scene.Objects.Triangle
 import Test.HUnit.Lang
@@ -54,7 +57,8 @@ main = do
   transformationsTests <- testSpec "OpalFalcon.Math.Transformations" transformationsSpec
   cameraTests <- testSpec "OpalFalcon.Scene.Camera" cameraSpec
   triangleTests <- testSpec "OpalFalcon.Scene.Objects.Triangle" triangleSpec
-  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [kdTreeTests, photonTests, photonCollectionTests, vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests]
+  stHeapTests <- testSpec "OpalFalcon.Photon.STHeap" stHeapSpec 
+  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [kdTreeTests, photonTests, photonCollectionTests, vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests, stHeapTests]
 
 -- Only test non-trivial operations on vectors
 vectorSpec :: Spec
@@ -328,3 +332,34 @@ photonCollectionSpec =
        in do
             ((fmap fst $ convexHull points zAxis) `shouldBe` hullPointsOrdered)
             ((convexHullArea points zAxis) `shouldBe` Just 22)
+
+stHeapSpec :: Spec
+stHeapSpec =
+  describe "ST Heap" $ do
+    it "Partially filled" $
+      let lst = runST $ do
+            heap <- mkSTHeap 10 (origin :: (Vec3 Int)) (distance2 origin)
+            pushHeap (constVec 4) heap
+            pushHeap (constVec 1) heap
+            pushHeap (constVec 2) heap
+            pushHeap (constVec 6) heap
+            pushHeap (constVec 5) heap
+            getHeapContents heap
+       in do
+            (lst `shouldBe` ([constVec 6, constVec 5, constVec 2, constVec 1, constVec 4], 5))
+    it "Fully filled" $
+      let lst = runST $ do
+            heap <- mkSTHeap 7 (origin :: (Vec3 Int)) (distance2 origin)
+            pushHeap (constVec 4) heap
+            pushHeap (constVec 1) heap
+            pushHeap (constVec 2) heap
+            pushHeap (constVec 6) heap
+            pushHeap (constVec 5) heap
+            pushHeap (constVec 5) heap
+            pushHeap (constVec 5) heap
+            pushHeap (constVec 5) heap
+            pushHeap (constVec 5) heap
+            pushHeap (constVec 5) heap
+            getHeapContents heap
+       in do
+            (lst `shouldBe` ([constVec 5, constVec 5, constVec 5, constVec 1, constVec 4, constVec 2, constVec 5], 7))

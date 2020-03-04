@@ -78,7 +78,7 @@ renderIlluminance glob scene cam height =
   let shoot r =
         case probeCollection (objects scene) r of
           Nothing -> black
-          Just h -> trace (show c) $ c |/ 250
+          Just h -> {-trace (show c)-} c
             where
               c = glob (hitPos h) (negateVec $ dir $ hitInc h) (hitNorm h) (brdf $ hitMat h)
    in map shoot $ genRays (floor $ (cameraAspect cam) * (fromIntegral height)) (toInteger height) (cameraRay cam) (cameraFOV cam)
