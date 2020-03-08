@@ -2,16 +2,17 @@
 
 module Main where
 
+-- import OpalFalcon.RayTracer
+
+import Control.Monad.Random
 import qualified Data.Array as A
 import OpalFalcon.BaseTypes
--- import OpalFalcon.RayTracer
 import OpalFalcon.Images
 import OpalFalcon.KdTree
 import OpalFalcon.Material
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
-import OpalFalcon.PathTracer
 import OpalFalcon.Photon.Photon
 import OpalFalcon.Photon.PhotonTracer
 import OpalFalcon.Photon.Visualizer
@@ -24,6 +25,9 @@ import OpalFalcon.Scene.Objects.Plane
 import OpalFalcon.Scene.Objects.PointLight
 import OpalFalcon.Scene.Objects.Sphere
 import OpalFalcon.Scene.Objects.Triangle
+import OpalFalcon.Util.Random
+import OpalFalcon.XTracing.PathTracer
+import OpalFalcon.XTracing.XTracer
 import System.Random
 
 -- The Cornell Box
@@ -126,26 +130,29 @@ filterJust [] = []
 filterJust ((Nothing) : xs) = filterJust xs
 filterJust ((Just x) : xs) = x : (filterJust xs)
 
-spherePhotonShoot sc pow cnt pos = filterJust $ map (\(d, r) -> shootPhoton 1 0 sc r (EPhoton (Ray pos d) (pow |/ (fromIntegral cnt)))) $ zip (take cnt $ randoms $ mkStdGen 0xdeadbeef) $ randGens $ mkStdGen 0x1337dead
-
-globIllum :: PhotonMap -> Int -> Double -> Vec3d -> Vec3d -> Vec3d -> (Vec3d -> Vec3d -> ColorRGBf) -> ColorRGBf
-globIllum pmap pcount maxDist pos inc norm brdf = estimateRadiance pmap pcount pos inc maxDist brdf norm
+spherePhotonShoot sc pow cnt pos =
+  do
+    rnd <- getRandoms
+    mapM (\d -> shootPhoton 0 sc (EPhoton (Ray pos d) (pow |/ (fromIntegral cnt)))) $ take cnt rnd
 
 main :: IO ()
 main =
   let w = 100
       h = 100
-      -- pixs = pathTraceScene (globIllum pmap 200 0.1) (mkStdGen 0x1337beef) cornellBox cam h
-      pixs = renderIlluminance (globIllum pmap 150 1.0) cornellBox cam h
+      -- pixs = pathTraceScene (globIllum pmap 200 1.0) (mkStdGen 0x1337beef) cornellBox cam h
+      gil pmap pcount maxDist pos inc norm brdf = estimateRadiance pmap pcount pos inc maxDist brdf norm
+      -- ptrcr = PathTracer {globalIllum = gil pmap 200 1.0}
+      -- pixs = pathTraceScene ptrcr cornellBox h cam
       -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
-      phs = spherePhotonShoot cornellBox (constVec 50) 30000 (V3 0 0 0)
       cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 75, cameraAspect = 1}
-      pmap = (mkKdTree phs) :: PhotonMap
-      -- (phs',cnt) = collectPhotons pmap 30000 (V3 (-2) 0 0) 2
+   in -- (phs',cnt) = collectPhotons pmap 30000 (V3 (-2) 0 0) 2
       -- (phs1,cnt1) = collectPhotons pmap 30000 (V3 0 0 (-2)) 2
       -- (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
       -- fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
-   in do
+      do
+        phs <- filterJust <$> (evalRandIO $ spherePhotonShoot cornellBox (constVec 50) 30000 (V3 0 0 0))
+        pmap <- return $ ((mkKdTree phs) :: PhotonMap)
+        pixs <- return $ renderIlluminance (gil pmap 100 1.0) cornellBox cam h
         -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
         -- saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
-        saveToPngRtr "pngfile.png" pixs w h;
+        saveToPngRtr "pngfile.png" pixs w h

@@ -1,7 +1,6 @@
 module OpalFalcon.Photon.Visualizer where
 
 import Control.Monad.ST
-import Debug.Trace
 import Data.Array
 import Data.Array.ST
 import Data.Maybe
@@ -9,9 +8,8 @@ import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
-import OpalFalcon.PathTracer
 import OpalFalcon.Photon.Photon
-import OpalFalcon.RayTraceUtils
+import OpalFalcon.XTracing.RayTraceUtils
 import OpalFalcon.Scene
 import OpalFalcon.Scene.Camera
 
@@ -81,4 +79,4 @@ renderIlluminance glob scene cam height =
           Just h -> {-trace (show c)-} c
             where
               c = glob (hitPos h) (negateVec $ dir $ hitInc h) (hitNorm h) (brdf $ hitMat h)
-   in map shoot $ genRays (floor $ (cameraAspect cam) * (fromIntegral height)) (toInteger height) (cameraRay cam) (cameraFOV cam)
+   in map shoot $ genRays cam height

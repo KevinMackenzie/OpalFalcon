@@ -29,6 +29,7 @@ library:
   - bytestring
   - JuicyPixels
   - random
+  - MonadRandom
   source-dirs: library
 
 executables:
@@ -40,6 +41,7 @@ executables:
     - OpalFalcon
     - random
     - array
+    - MonadRandom
     ghc-options:
     - -rtsopts
     - -threaded

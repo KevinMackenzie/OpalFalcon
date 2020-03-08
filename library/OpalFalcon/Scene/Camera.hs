@@ -1,7 +1,6 @@
 module OpalFalcon.Scene.Camera where
 
 import Data.Array
-import Debug.Trace
 import OpalFalcon.Math.Matrix
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations

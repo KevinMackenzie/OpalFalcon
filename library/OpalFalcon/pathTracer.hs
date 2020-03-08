@@ -61,12 +61,6 @@ tracePath glob g s md d r@(Ray _ iDir)
                       Just h  -> let recurse = (\g' -> tracePath glob g' s md (d+1))
                                  in  {-trace ("depth: " ++ (show d)) $-} tracePath' glob g recurse iDir h
 
--- Generates an infinite list of distinct random number generators
-randGens :: (RandomGen g) => g -> [g]
-randGens g = g':gs
-             where (g', g'') = split g
-                   gs = randGens g''
-
 pathTraceScene :: (RandomGen g, ObjectCollection o) => GlobalIllum -> g -> Scene o -> Camera -> Int -> [ColorRGBf]
 pathTraceScene glob g scene cam height = 
     map (\(g', r) -> tracePath glob g' scene 2 0 r) $
