@@ -103,7 +103,7 @@ mkPhotonMap = mkKdTree
 
 -- A photon that will evaluate its incoming direction strictly
 -- #TODO: this will always be used in haskell code
-data Photon = Photon !Vec3d !ColorRGBf !Vec3d !KdAxis deriving Show
+data Photon = Photon Vec3d ColorRGBf Vec3d KdAxis deriving Show
 
 mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
 mkPhoton h c d = Photon h c d XAxis
