@@ -22,6 +22,7 @@ import GHC.Exts
 import GHC.Word
 import GHC.Float (double2Float)
 import GHC.ST (ST(..), runST)
+-- import OpalFalcon.Math.FastTrig
 
 type PhotonMap = KdTree UArray Int Photon
 
@@ -169,18 +170,21 @@ genRandomPhotons n = if  n == 0 then return [] else do {
 blankPhoton :: Photon
 blankPhoton = Photon origin origin origin XAxis
 
+{-# INLINE unpackFlags #-}
 unpackFlags :: Word -> KdAxis
 unpackFlags 1 = XAxis
 unpackFlags 2 = YAxis
 unpackFlags 3 = ZAxis
 unpackFlags _ = error "Photon axis value violated"
 
+{-# INLINE packFlags #-}
 packFlags :: KdAxis -> Word
 packFlags XAxis = 1
 packFlags YAxis = 2
 packFlags ZAxis = 3
 packFlags _ = error "Photon axis value violated"
 
+{-# INLINE packDir #-}
 packDir :: Vec3d -> Word
 packDir (V3 x y z) = 
     let c2 = 256.0 / (2*pi)
@@ -190,6 +194,7 @@ packDir (V3 x y z) =
         phi = round $ 2*c2 * phi'
      in phi .|. (shiftL theta 8)
 
+{-# INLINE unpackDir #-}
 unpackDir :: Word -> Vec3d
 unpackDir w =
     let c = pi / 256.0
@@ -202,6 +207,11 @@ unpackDir w =
         z = cos phi
     in  V3 x y z
 
+-- Hm: this is actually slower; maybe because It isn't smart enough to do the "C" thing and pack the data tightly and copy out only what it needs
+-- {-# INLINE unpackDirApprox #-}
+-- unpackDirApprox :: Word -> Vec3d
+-- unpackDirApprox = fastLowPSphereToRect
+
 -- Fast trig functions for 8 bit angle values
 -- cosTable :: Data.Array Int Float
 -- sinTable :: Data.Array Int Float
@@ -211,15 +221,18 @@ unpackDir w =
 -- fastSin (W# w) = sinTable V.!! w
 
 -- Converts between theta,phi direction portion of the 4th 32 bits to a normalized vec3 and converts the flags portion
+{-# INLINE unpackDirFlags #-}
 unpackDirFlags :: Word -> (Vec3d, KdAxis)
 unpackDirFlags w = 
     let dir = w .&. 0xffff
         flags = shiftR (w .&. 0xffff0000) 16
     in  (unpackDir dir, unpackFlags flags)
+{-# INLINE packDirFlags #-}
 packDirFlags :: Vec3d -> KdAxis -> Word
 packDirFlags dir axis = (shiftL (packFlags axis) 16) .|. (packDir dir)
 -- Converts between shared exponent color and separate exponent color
 -- (see https://www.khronos.org/registry/OpenGL/extensions/EXT/EXT_texture_shared_exponent.txt)
+{-# INLINE unpackColor #-}
 unpackColor :: Word -> ColorRGBf
 unpackColor w = 
     let n = 9 :: Int
@@ -227,6 +240,7 @@ unpackColor w =
         col_p = fmap fromIntegral $ V3 (shiftR (w .&. 0x7ffffff) 18) (shiftR (w .&. 0x3ffff) 9) (w .&. 0x1ff)
         exp_p = fromIntegral $ shiftR w 27
      in fmap (\x -> (fromIntegral x) * 2^^(exp_p- b - n)) col_p
+{-# INLINE packColor #-}
 packColor :: ColorRGBf -> Word
 packColor col = 
     let n = 9 :: Int
