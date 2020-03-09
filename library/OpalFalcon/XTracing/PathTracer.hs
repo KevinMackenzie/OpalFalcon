@@ -53,4 +53,4 @@ pathTraceScene pt sc height cam =
                    in do
                         refl <- shootRay (Ray pos oDir) (PGloss : path)
                         return $ (brdf m iDir oDir) |*| refl
-   in mapM (\(n, x) -> let c = shootRay x [] in do v <- c; trace ((show n) ++ ":" ++ (show v)) c) $ zip [1 ..] $ genRays cam height
+   in mapM (\(n, x) -> shootRay x []) $ zip [1 ..] $ genRays cam height
