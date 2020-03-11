@@ -5,21 +5,17 @@
 module OpalFalcon.Photon.Photon where
 
 import OpalFalcon.Math.Vector
-import qualified OpalFalcon.Math.Transformations as TF
-import OpalFalcon.Math
 import OpalFalcon.Photon.STHeap
 
 import System.Random
 
 import Control.Monad
 import Data.Array.ST
-import Control.Monad.ST
 import Data.STRef
 import OpalFalcon.KdTree
 import Data.Array.Base
 import Data.Bits
 import GHC.Exts
-import GHC.Word
 import GHC.Float (double2Float)
 import GHC.ST (ST(..), runST)
 -- import OpalFalcon.Math.FastTrig
@@ -40,7 +36,7 @@ estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> (Vec3d -> Vec
 estimateRadiance pmap pCount hpos incDir maxDist brdf norm = 
     let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.01*maxDist) hpos) hpos maxDist
         pts = map (\(Photon pos _ _ _) -> pos) photons
-        r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
+        -- r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
         -- area = Just $ pi*r2
         area = double2Float <$> convexHullArea pts norm
         r = case area of
@@ -53,7 +49,7 @@ estimateRadiance pmap pCount hpos incDir maxDist brdf norm =
 convexHullArea :: [Vec3d] -> Vec3d -> Maybe Double
 convexHullArea [] _ = Nothing -- Zero points: no area
 convexHullArea (_:[]) _ = Nothing -- One point: no area
-convexHullArea (p0:(p1:[])) norm = Nothing -- Two points: do something
+convexHullArea (_:(_:[])) _ = Nothing -- Two points: do something
 convexHullArea pts norm = 
     let ((o,_):t) = convexHull pts norm
         -- Use the dot product to get the area projected onto the plane
@@ -117,7 +113,7 @@ collectPhotons :: PhotonMap -> Int -> (Vec3d -> Bool) -> Vec3d -> Double -> ([Ph
 collectPhotons pmap n cull x maxDist = 
     let pmapSize = kdTreeSize pmap
         recurse p heap d2 = 
-            let ph@(Photon pos pow dir axis) = indexPhotonMap pmap p
+            let ph@(Photon pos _ _ axis) = indexPhotonMap pmap p
                 l = recurse (2*p) heap d2
                 r = recurse (2*p+1) heap d2
                 del = (axisElem axis x) - (axisElem axis pos)
