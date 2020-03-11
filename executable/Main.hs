@@ -72,15 +72,15 @@ ol :: ObjectList
 
 sc :: Scene ObjectList
 
-sphereMat dif refl (MkSphere s _) hp = mkSimpleMat dif refl (normalize (hp |-| (affineTranslate s)))
+sphereMat refl (MkSphere s _) hp = mkSimpleMat refl (normalize (hp |-| (affineTranslate s)))
 
-planeMat dif (MkPlane (V4 _ _ n _)) _ = mkDiffuseMat dif (fromHomo n)
+planeMat refl (MkPlane (V4 _ _ n _)) _ = mkDiffuseMat refl (fromHomo n)
 
 discMat dif (MkDisc (MkPlane (V4 _ _ n _)) _) _ = mkDiffuseMat (V3 0.5 0.8 0.4) (fromHomo n)
 
-sph = mkSphereObject (MkSphere (mkAffineSpace (V3 (-2) 1.3 (-2)) xAxis yAxis zAxis) 1.5) (sphereMat (V3 0 1 0) (V3 0.8 0.4 0.4))
+sph = mkSphereObject (MkSphere (mkAffineSpace (V3 (-2) 1.3 (-2)) xAxis yAxis zAxis) 1.5) (sphereMat (V3 0.8 0.4 0.4))
 
-sph1 = mkSphereObject (MkSphere (mkAffineSpace (V3 2 1.3 (-2)) xAxis yAxis zAxis) 1.5) (sphereMat (V3 0 1 0) (V3 0.4 0.8 0.4))
+sph1 = mkSphereObject (MkSphere (mkAffineSpace (V3 2 1.3 (-2)) xAxis yAxis zAxis) 1.5) (sphereMat (V3 0.4 0.8 0.4))
 
 ground = mkPlaneObject (MkPlane (mkAffineSpace (V3 0 (-2) 0) xAxis (negateVec zAxis) yAxis)) (planeMat (V3 0.5 0.5 0.5))
 
@@ -152,8 +152,9 @@ main =
       do
         phs <- filterJust <$> (evalRandIO $ spherePhotonShoot cornellBox (constVec 50) 50000 (V3 0 0 0))
         pmap <- return $ ((mkKdTree phs) :: PhotonMap)
-        -- pixs <- return $ renderIlluminance (gil pmap 100 1.0) cornellBox cam h
-        pixs <- evalRandIO $ pathTraceScene (PathTracer {globalIllum = gil pmap 500 1.0}) cornellBox h cam
+        pixs <- return $ renderIlluminance (gil pmap 300 1.0) cornellBox cam h
+        -- pixs <- evalRandIO $ pathTraceScene (PathTracer {globalIllum = gil pmap 500 1.0}) cornellBox h cam
         -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
         -- saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
+        -- print $ map (unpackDir) [0..65535]
         saveToPngRtr "pngfile.png" pixs w h

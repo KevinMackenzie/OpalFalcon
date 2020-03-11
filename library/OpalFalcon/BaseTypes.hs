@@ -1,114 +1,66 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE RankNTypes #-}
+
 module OpalFalcon.BaseTypes where
 
-import OpalFalcon.Math.Vector
+import Control.Monad.Random
 import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Vector
 
--- Type classes for reducing exposure on Objects
-class Locatable a where
-    position :: a -> Vec3d
-
--- The purpose of the intersection algorithm serves as a means to find the object it hit
---  but the purpose of the hit class is to cache intersection status and propagate the ray trace 
--- In each hit, we cache the material to bounce off of
-
--- We don't bother with material information at the top level since we let the objects
--- fully define how ray reflections modify the ray color
-
--- TODO: does this serve any real purpoes?
-class Visible a where
-    intersectRay :: a -> Ray -> Maybe Hit
-
-class ObjectProvider a where
-    getObject :: a -> Object
-
--- Primary Data types
-
--- Define ray with additional data beyond math ray
-data RtRay = MkRtR { rayBase :: Ray
-                   , rayColor :: ColorRGBf
-                   , rayDepth :: Integer
-                   , rayHit :: Maybe Hit
-                   -- We could also bundle an RNG here for MC RT
-                   }
-    deriving (Show)
--- We can take advantage of lazy evaluation so not all of these will evaluated every time
-data Hit = MkHit { hitPos :: Vec3d
-                 , hitNorm :: Vec3d
-                 , hitInc :: Ray
-                 , hitParam :: Double
-                 , hitMat :: AppliedMaterial
-                 }
+data Hit
+  = MkHit
+      { hitPos :: Vec3d,
+        hitNorm :: Vec3d,
+        hitInc :: Ray, -- The ray used to shoot this hit
+        hitParam :: Double,
+        hitMat :: AppliedMaterial
+      }
 
 instance Show Hit where
-    show h = (foldl (\x -> (\y -> (++) x ((++) "\n    " y))) "Hit {" [(show $ hitPos h), (show $ hitNorm h), (show $ hitInc h), (show $ hitParam h),  (show $ hitMat h)]) ++ "\n}\n"
+  show h = (foldl (\x -> (\y -> (++) x ((++) "\n    " y))) "Hit {" [(show $ hitPos h), (show $ hitNorm h), (show $ hitInc h), (show $ hitParam h)]) ++ "\n}\n"
 
 -- Object collects the minimum definition for an ray-tracable object
-data Object = MkObj { objPos :: Vec3d
-                    , objIntersectRay :: Ray -> Maybe Hit
-                    }
+data Object
+  = MkObj
+      { objPos :: Vec3d,
+        objIntersectRay :: Ray -> Maybe Hit
+      }
+
+data RayTransmitResult = RayPass Vec3d ColorRGBf | RayTerm
+
+-- The concept is it is an arbitrary material applied to the parameter
+--  of a hit for a specific object.  This lets us avoid having
+--  general-purpose "hit UV" properties and material mappings
+-- Note: all incoming directions must be "flipped"
+-- TODO: investigate if it is possible to merge stochastic transmission functions
+data AppliedMaterial
+  = AppliedMaterial
+      { -- Reflects a ray from a provided incoming direction.  Used in a path-tracing method
+        transmitRay :: (forall g m. (Monad m, RandomGen g) => Vec3d -> ColorRGBf -> RandT g m RayTransmitResult),
+        -- Reflects a photon from a provided incoming direction.  Used in a russian-roulette method
+        transmitPhoton :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m (Vec3d, ColorRGBf)),
+        -- The BRDF used when estimating irradiance from photon map
+        photonBrdf :: Vec3d -> Vec3d -> ColorRGBf
+      }
 
 -- Provides function to sample light source from a point in the scene
 --   This is only good for lambertian surfaces
 data LightSource = MkLight { lightSample :: (Ray -> Maybe Hit) -> Vec3d -> ColorRGBf }
 
--- The concept is it is an arbitrary material applied to the parameter
---  of a hit for a specific object.  This lets us avoid having 
---  general-purpose "hit UV" properties and material mappings
-data AppliedMaterial = MkAppMat { matDiffuseColor :: ColorRGBf
-                                -- emittence in direction of ray; Note: to be replaced with global illumination
-                                , emittence :: Vec3d -> ColorRGBf
-                                -- TODO: This should be in frame of reference of normal
-                                -- TODO: normal is only one vector, we need 2 for anisotropy.  Do we add it to "Hit"?
-                                --        incoming outgoing reflectance
-                                , brdf :: Vec3d -> Vec3d -> ColorRGBf
-                                -- Modify distribution of random direction for importance sampling
-                                -- Note: This is a hemisphere, but may change for refraction
-                                --              incoming random   random (transformed)
-                                , importance :: Vec3d -> Vec3d -> Vec3d
-                                }
-instance Show AppliedMaterial where
-    show m = show $ matDiffuseColor m
-
--- Instances for Visible 
-instance Visible Object where
-    intersectRay = objIntersectRay
-
--- Instances for Locatable
-instance Locatable Object where
-    position = objPos
-instance Locatable Ray where 
-    position = pos
-instance Locatable RtRay where
-    position = pos . rayBase
-instance Locatable Hit where
-    position = hitPos
-
--- Constructors et al
-defaultRtRay :: Ray -> RtRay
-defaultRtRay base = 
-    MkRtR { rayBase = base
-          , rayColor = whitef
-          , rayDepth = 0
-          , rayHit = Nothing
-          }
-
 -- We don't really want to define `Ord` over Hits
 closerHit :: Vec3d -> Maybe Hit -> Maybe Hit -> Maybe Hit
-closerHit p mh1 mh2 = 
-    let f x = mag $ (hitPos x) |-| p
-        c x y = (f x) < (f y)
-    in  maybeCompare c mh1 mh2
+closerHit p mh1 mh2 =
+  let f x = mag $ (hitPos x) |-| p
+      c x y = (f x) < (f y)
+   in maybeCompare c mh1 mh2
 
 -- Where should this go?
 maybeCompare :: (a -> a -> Bool) -> Maybe a -> Maybe a -> Maybe a
 maybeCompare f m0 m1 =
-    case (m0, m1) of
-        (Nothing, Nothing) -> Nothing
-        (Nothing, Just v) -> Just v
-        (Just v, Nothing) -> Just v
-        (Just h0, Just h1) -> if f h0 h1 then Just h0 else Just h1
+  case (m0, m1) of
+    (Nothing, Nothing) -> Nothing
+    (Nothing, Just v) -> Just v
+    (Just v, Nothing) -> Just v
+    (Just h0, Just h1) -> if f h0 h1 then Just h0 else Just h1
 
 tmap0 :: (a -> b) -> (a, c) -> (b, c)
 tmap0 f (a, b) = (f a, b)

@@ -63,6 +63,7 @@ instance Vector Vec4 where {}
 type Vec2d = Vec2 Double
 type Vec2i = Vec2 Int
 
+type Vec3f = Vec3 Float
 type Vec3d = Vec3 Double
 type Vec3i = Vec3 Int
 
@@ -79,7 +80,7 @@ type ColorRGBAf = Vec4 Float
 
 white :: ColorRGB
 white = constVec 255
-whitef :: ColorRGBf
+whitef :: (Fractional a) => Vec3 a
 whitef = constVec 1.0
 
 gray :: (Vector a) => b -> a b
