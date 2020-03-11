@@ -34,6 +34,9 @@ vecZip = liftA2
 approxEq :: (Vector a, Ord b, Fractional b) => b -> a b -> a b -> Bool
 approxEq e v0 v1 = foldr (&&) True $ liftA2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
 
+(|==|) :: (Vector a, Eq b) => a b -> a b -> Bool
+(|==|) x y = foldl (&&) True $ vecZip (==) x y
+
 -- If we don't support pattern matching (like using vectors/arrays) we don't need 'data' declarations for each vector length
 -- Higher-order types
 data Vec2 a = V2 !a !a
@@ -160,18 +163,14 @@ vecAverage l =
 vecAvgComp :: (Vector a, Fractional b) => a b -> b
 vecAvgComp v = (foldl (+) 0 v) / (fromInteger $ toInteger $ length v)
 -- Normalize
-normalize :: (Vector a, Floating b) => a b -> a b
-normalize v = fmap ( / (mag v)) v
+normalize :: (Vector a, Eq b, Floating b) => a b -> a b
+normalize v = if v |==| origin then origin else fmap ( / (mag v)) v
 -- Clamp
 clamp :: (Vector a, Ord b) => a b -> a b -> a b
 clamp = liftA2 (\x y -> if x < y then x else y)
 -- Cross Product (only defined on vec3's)
 (|><|) :: (Num a) => (Vec3 a) -> (Vec3 a) -> (Vec3 a)
 (|><|) (V3 a1 a2 a3) (V3 b1 b2 b3) = (V3 (a2*b3-a3*b2) (a3*b1-a1*b3) (a1*b2-a2*b1))
-
--- TODO: dynamic range...?
-toPixel :: ColorRGBf -> ColorRGB
-toPixel = fmap ((min 255) . round . (255*))
 
 -- Functions for converting vectors to and from homogeneous coords
 fromHomo :: (Fractional a) => Vec4 a -> Vec3 a

@@ -1,6 +1,7 @@
 module OpalFalcon.Photon.PhotonTracer where
 
 import Control.Monad.Random
+import Debug.Trace
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
@@ -22,6 +23,10 @@ shootPhoton minBounces scene photon =
         let iDir = negateVec prDir
          in do
               (oDir, refl) <- transmitPhoton m iDir
+              -- TODO: I don't think this is the right measure of reflectance for determing whether to reflect / absorb:  it returns the BRDF which is a distribution function, and does not tell us actual reflectance that we need for russian roulette.
+              -- TODO: How do we get reflectance from the BRDF?
+              -- ... or am i double misunderstanding this?
+              -- Regardless, it doesn't seem like enough photons are diffused to show bleeding
               let reflAvg = vecAvgComp refl
                in do
                     rnum <- getRandom
@@ -30,5 +35,5 @@ shootPhoton minBounces scene photon =
                       else
                         if minBounces > depth
                           then return Nothing
-                          else return $ Just $ mkPhoton pos pCol iDir
+                          else return $ {-trace (show depth) $-} Just $ mkPhoton pos pCol iDir
    in shoot 0 photon

@@ -4,8 +4,8 @@ module OpalFalcon.Material
   )
 where
 
-import Debug.Trace
 import Control.Monad.Random
+import Debug.Trace
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Vector
 
@@ -15,11 +15,11 @@ mkDiffuseMat refl norm =
   mkSchlickMat
     SchlickMat
       { schlickSpecularReflectance = refl,
-        schlickRoughness = 0.999,
-        schlickAnisotropy = 0.001
+        schlickRoughness = 0.9,
+        schlickIsotropy = 1.0
       }
     norm
-    (V3 0 0 1) -- If Anisotropy is small, the grain direction does not matter
+    (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
 
 -- Material with purely specular reflectivity
 mkSimpleMat :: ColorRGBf -> Vec3d -> AppliedMaterial
@@ -28,16 +28,16 @@ mkSimpleMat refl norm =
     SchlickMat
       { schlickSpecularReflectance = refl,
         schlickRoughness = 0.001,
-        schlickAnisotropy = 0.0001
+        schlickIsotropy = 1.0
       }
     norm
-    (V3 0 0 1) -- If Anisotropy is small, the grain direction does not matter
+    (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
 
 data SchlickMaterial
   = SchlickMat
       { schlickSpecularReflectance :: ColorRGBf,
         schlickRoughness :: Double,
-        schlickAnisotropy :: Double
+        schlickIsotropy :: Double
       }
 
 swapIf :: Bool -> (a, a) -> (a, a)
@@ -54,7 +54,7 @@ schlickRandomGlossyHalfVec
   SchlickMat
     { schlickSpecularReflectance = f0,
       schlickRoughness = sigma,
-      schlickAnisotropy = psi
+      schlickIsotropy = psi
     }
   norm
   grainDir =
@@ -72,7 +72,7 @@ schlickBRDF
   SchlickMat
     { schlickSpecularReflectance = f0,
       schlickRoughness = sigma,
-      schlickAnisotropy = psi
+      schlickIsotropy = psi
     }
   norm
   grainDir
@@ -93,7 +93,14 @@ schlickBRDF
         zTerm = sigma / ((1 + sigma * t ^ 2 - t ^ 2) ^ 2)
         aTerm = sqrt $ psi / (psi ^ 2 - psi ^ 2 * w ^ 2 + w ^ 2)
         -- The "D" term differs between the two papers
-        dTerm = ((gTerm v) * (gTerm v') * zTerm * aTerm) / (4 * pi * v * v') + aTerm * (1 - (gTerm v) * (gTerm v')) / pi
+        dTerm =
+          ( if v == 0 || v' == 0
+              then 0 -- TODO: This is because we don't/can't assume general position
+              else ((gTerm v) * (gTerm v') * zTerm * aTerm) / (4 * pi * v * v')
+          )
+            + aTerm
+            * (1 - (gTerm v) * (gTerm v'))
+            / pi
      in double2FloatVec $ sTerm |* (reflDiffuse / pi + reflGlossy * dTerm + reflSpecular * specBRDF)
 
 -- This is my best guess, based on Henrick (2001) pg 26,

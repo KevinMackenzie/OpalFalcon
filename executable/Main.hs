@@ -50,7 +50,7 @@ cornellBox = MkScene
     diffT d t _ = mkDiffuseMat d (normalize $ triangleNorm t)
     leftMat = diffT (V3 0.95 0.2 0.2)
     rightMat = diffT (V3 0.2 0.95 0.2)
-    blankMat = diffT (V3 0.7 0.7 0.7)
+    blankMat = diffT (V3 0.95 0.95 0.95)
     left0 = mkTriangleObject (MkTriangle vlbf vlbb vltb) leftMat
     left1 = mkTriangleObject (MkTriangle vlbf vltb vltf) leftMat
     right0 = mkTriangleObject (MkTriangle vrbf vrtb vrbb) rightMat
@@ -150,9 +150,9 @@ main =
       -- (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
       -- fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
       do
-        phs <- filterJust <$> (evalRandIO $ spherePhotonShoot cornellBox (constVec 50) 50000 (V3 0 0 0))
+        phs <- filterJust <$> (evalRandIO $ spherePhotonShoot cornellBox (constVec 10) 50000 (V3 0 0 0))
         pmap <- return $ ((mkKdTree phs) :: PhotonMap)
-        pixs <- return $ renderIlluminance (gil pmap 300 1.0) cornellBox cam h
+        pixs <- return $ renderIlluminance (gil pmap 400 1.0) cornellBox cam h
         -- pixs <- evalRandIO $ pathTraceScene (PathTracer {globalIllum = gil pmap 500 1.0}) cornellBox h cam
         -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
         -- saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
