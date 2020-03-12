@@ -9,6 +9,7 @@ import OpalFalcon.Photon.STHeap
 
 import System.Random
 
+import Debug.Trace
 import Control.Monad
 import Data.Array.ST
 import Data.STRef
@@ -36,15 +37,16 @@ estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> (Vec3d -> Vec
 estimateRadiance pmap pCount hpos incDir maxDist brdf norm = 
     let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.01*maxDist) hpos) hpos maxDist
         pts = map (\(Photon pos _ _ _) -> pos) photons
-        -- r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
-        -- area = Just $ pi*r2
-        area = double2Float <$> convexHullArea pts norm
+        r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
+        area = if r2 == 0 then Nothing else Just $ pi*r2
+        -- area = ((\x -> if x == 0 then trace ("Hit at (" ++ (show hpos) ++ ") wiht norm (" ++ (show norm) ++ ") and " ++ (show $ length pts) ++ " photons") x else x) . double2Float) <$> convexHullArea pts norm
         r = case area of
             Nothing -> black -- No area means no photons or not enough
             Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (brdf inc incDir)) |+| c) black photons)
       in r
 
 
+-- TODO: Theres an error in the convex hull code...
 -- Finds the area of the convex hull containing all photons
 convexHullArea :: [Vec3d] -> Vec3d -> Maybe Double
 convexHullArea [] _ = Nothing -- Zero points: no area

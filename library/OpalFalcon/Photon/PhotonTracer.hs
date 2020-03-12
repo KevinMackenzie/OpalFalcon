@@ -13,27 +13,22 @@ import System.Random
 data EmissivePhoton = EPhoton !Ray !ColorRGBf
 
 -- Traces a photon through the scene using russian-roulette based on BRDF for material
-shootPhoton :: (Monad m, RandomGen g, ObjectCollection o) => Int -> Scene o -> EmissivePhoton -> RandT g m (Maybe Photon)
+shootPhoton :: (Monad m, RandomGen g, ObjectCollection o) => Int -> Scene o -> EmissivePhoton -> RandT g m [Photon]
 shootPhoton minBounces scene photon =
   let shoot depth ph@(EPhoton epr _) =
         case probeCollection (objects scene) epr of
-          Nothing -> return Nothing
+          Nothing -> return []
           Just h -> bounce depth ph h
       bounce depth (EPhoton (Ray _ prDir) pCol) MkHit {hitPos = pos, hitMat = m, hitNorm = norm} =
         let iDir = negateVec prDir
+            next oDir refl = shoot (depth + 1) (EPhoton (Ray pos oDir) (pCol |*| (refl |/ (vecAvgComp refl))))
          in do
-              (oDir, refl) <- transmitPhoton m iDir
-              -- TODO: I don't think this is the right measure of reflectance for determing whether to reflect / absorb:  it returns the BRDF which is a distribution function, and does not tell us actual reflectance that we need for russian roulette.
-              -- TODO: How do we get reflectance from the BRDF?
-              -- ... or am i double misunderstanding this?
-              -- Regardless, it doesn't seem like enough photons are diffused to show bleeding
-              let reflAvg = vecAvgComp refl
-               in do
-                    rnum <- getRandom
-                    if rnum < reflAvg
-                      then shoot (depth + 1) (EPhoton (Ray pos oDir) (pCol |*| (refl |/ reflAvg)))
-                      else
-                        if minBounces > depth
-                          then return Nothing
-                          else return $ {-trace (show depth) $-} Just $ mkPhoton pos pCol iDir
+              result <- transmitPhoton m iDir
+              case result of
+                PhotonAbsorb -> return []
+                PhotonStore oDir refl ->
+                  if minBounces > depth
+                    then next oDir refl
+                    else ((mkPhoton pos pCol iDir) :) <$> (next oDir refl)
+                PhotonPass oDir refl -> next oDir refl
    in shoot 0 photon

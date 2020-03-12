@@ -229,3 +229,11 @@ float2DoubleVec = fmap float2Double
 
 double2FloatVec :: (Vector a) => a Double -> a Float
 double2FloatVec = fmap double2Float
+
+-- Uses convention of physics (theta = inclination, psi = azimuth)
+fromSphere :: (Floating b) => Vec3 b -> Vec3 b
+fromSphere (V3 r theta psi) = (V3 x y z)
+    where x = r*sinth*(cos psi)
+          y = r*sinth*(sin psi)
+          z = r*(cos theta)
+          sinth = sin theta

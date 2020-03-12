@@ -6,8 +6,10 @@ where
 
 import Control.Monad.Random
 import Debug.Trace
+import GHC.Float (double2Float, float2Double)
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Vector
+import OpalFalcon.Math.Lighting (cosWeightedDir)
 
 -- Material with purely diffuse reflectivity
 mkDiffuseMat :: ColorRGBf -> Vec3d -> AppliedMaterial
@@ -15,7 +17,7 @@ mkDiffuseMat refl norm =
   mkSchlickMat
     SchlickMat
       { schlickSpecularReflectance = refl,
-        schlickRoughness = 0.9,
+        schlickRoughness = 0.999,
         schlickIsotropy = 1.0
       }
     norm
@@ -110,48 +112,48 @@ schlickBRDF
 -- Henrick only references the 1993 one, but uses some equations from the 1994 one, so idk
 mkSchlickMat :: SchlickMaterial -> Vec3d -> Vec3d -> AppliedMaterial
 mkSchlickMat
-  mat@(SchlickMat {schlickRoughness = sigma})
+  mat@(SchlickMat {schlickSpecularReflectance = f0, schlickRoughness = sigma})
   norm
   grainDir =
     let brdf = schlickBRDF mat norm grainDir
         (reflDiffuse, reflGlossy, reflSpecular) = schlickDeriveParameters sigma
-        xmitRay iDir _ =
-          do
-            randVal <- getRandom -- Imporance sample the 3 brdf lobes
-            if randVal < reflGlossy
-              then do
-                -- Glossy
-                hVec <- schlickRandomGlossyHalfVec mat norm grainDir
-                let oDir = reflect iDir hVec
-                 in return $ RayPass oDir $ brdf False iDir oDir
-              else
-                if randVal < reflGlossy + reflDiffuse
-                  then return $ RayTerm -- Diffuse
-                  else
-                    let oDir = reflect iDir norm
-                     in return $ RayPass oDir $ brdf True iDir oDir
-        xmitPhoton iDir =
-          do
-            randVal <- getRandom -- Imporance sample the 3 brdf lobes
-            if randVal < reflGlossy
-              then do
-                -- Glossy
-                hVec <- schlickRandomGlossyHalfVec mat norm grainDir
-                let oDir = reflect iDir hVec
-                 in return (oDir, brdf False iDir oDir)
-              else
-                if randVal < reflGlossy + reflDiffuse
-                  then do
-                    -- Note: This path-tracing solution only uses photon map for emittance
-                    --    but it could also consider single diffuse bounces for direct illumination
-                    oDir <- getRandom
-                    return (oDir, brdf False iDir oDir)
-                  else
-                    let oDir = reflect iDir norm
-                     in return (oDir, brdf True iDir oDir)
+        xmitRay iDir _ = do
+          randVal <- getRandom -- Imporance sample the 3 brdf lobes
+          if randVal < reflGlossy
+            then do
+              -- Glossy
+              hVec <- schlickRandomGlossyHalfVec mat norm grainDir
+              let oDir = reflect iDir hVec
+               in return $ RayPass oDir $ brdf False iDir oDir
+            else
+              if randVal < reflGlossy + reflDiffuse
+                then return $ RayTerm -- Diffuse
+                else
+                  let oDir = reflect iDir norm
+                   in return $ RayPass oDir $ brdf True iDir oDir
+        xmitPhoton iDir = do
+          rrRand <- getRandom -- Russian-Roulette the surface reflectance
+          if rrRand >= (vecAvgComp f0)
+            then return PhotonAbsorb
+            else do
+              randVal <- getRandom -- Imporance sample the 3 brdf lobes
+              if randVal < reflGlossy
+                then do
+                  -- Glossy
+                  hVec <- schlickRandomGlossyHalfVec mat norm grainDir
+                  let oDir = reflect iDir hVec
+                   in return $ PhotonPass oDir $ brdf False iDir oDir
+                else
+                  if randVal < reflGlossy + reflDiffuse
+                    then do
+                      -- Diffuse:
+                      oDir <- cosWeightedDir norm
+                      return $ PhotonStore oDir $ brdf False iDir oDir
+                    else
+                      let oDir = reflect iDir norm -- Specular
+                       in return $ PhotonPass oDir $ brdf True iDir oDir
      in AppliedMaterial
           { transmitRay = xmitRay,
             transmitPhoton = xmitPhoton,
-            -- TODO: do we want the glossy contributions in the radiance estimates?
             photonBrdf = brdf False -- \i o -> let c = brdf False i o in trace ((show i) ++ "'-,-'" ++ (show o) ++ "==>" ++ (show c)) c
           }

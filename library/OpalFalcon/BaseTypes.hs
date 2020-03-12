@@ -26,6 +26,7 @@ data Object
       }
 
 data RayTransmitResult = RayPass Vec3d ColorRGBf | RayTerm
+data PhotonTransmitResult = PhotonPass Vec3d ColorRGBf | PhotonStore Vec3d ColorRGBf | PhotonAbsorb
 
 -- The concept is it is an arbitrary material applied to the parameter
 --  of a hit for a specific object.  This lets us avoid having
@@ -37,7 +38,7 @@ data AppliedMaterial
       { -- Reflects a ray from a provided incoming direction.  Used in a path-tracing method
         transmitRay :: (forall g m. (Monad m, RandomGen g) => Vec3d -> ColorRGBf -> RandT g m RayTransmitResult),
         -- Reflects a photon from a provided incoming direction.  Used in a russian-roulette method
-        transmitPhoton :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m (Vec3d, ColorRGBf)),
+        transmitPhoton :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m PhotonTransmitResult),
         -- The BRDF used when estimating irradiance from photon map
         photonBrdf :: Vec3d -> Vec3d -> ColorRGBf
       }
