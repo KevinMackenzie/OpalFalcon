@@ -1,4 +1,4 @@
-module OpalFalcon.XTracing.PathTracer where
+module OpalFalcon.XTracing.PathTracer (PathTracer (..), pathTraceScene) where
 
 import Control.Monad.Random
 import Debug.Trace
@@ -27,6 +27,8 @@ data PathTracer = PathTracer {globalIllum :: GlobalIllum}
 -- instance XTracer PathTracer where
 --   renderScene = pathTraceScene
 
+ptEpsilon = 0.00001
+
 pathTraceScene :: (Monad m, RandomGen g, ObjectCollection o) => PathTracer -> Scene o -> Int -> Camera -> RandT g m ([ColorRGBf])
 pathTraceScene pt sc height cam =
   let glob = globalIllum pt
@@ -44,5 +46,5 @@ pathTraceScene pt sc height cam =
                   rayResult <- transmitRay m iDir black
                   case rayResult of
                     RayTerm -> return $ glob pos iDir norm (photonBrdf m)
-                    RayPass oDir refl -> (refl |*|) <$> (shootRay (Ray pos oDir) (PGloss : path))
+                    RayPass oDir refl -> (refl |*|) <$> (shootRay (Ray (pos |+| (ptEpsilon *| oDir)) oDir) (PGloss : path))
    in mapM (\(n, x) -> shootRay x []) $ zip [1 ..] $ genRays cam height

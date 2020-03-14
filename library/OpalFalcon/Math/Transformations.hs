@@ -94,14 +94,6 @@ spacePos :: Matrix4 a -> Vec3 a
 spacePos (V4 _ _ _ w) = demote4 w
 -- in general: spacePos m = applyTransform m origin
 
-xAxis :: (Num a) => Vec3 a
-yAxis :: (Num a) => Vec3 a
-zAxis :: (Num a) => Vec3 a
-
-xAxis = (V3 1 0 0)
-yAxis = (V3 0 1 0)
-zAxis = (V3 0 0 1)
-
 -- Creates a vector space out of the provided position and basis vectors
 mkAffineSpace :: Vec3d -> Vec3d -> Vec3d -> Vec3d -> VectorSpace
 mkAffineSpace pos x y z = (V4 (toHomoDir x)

@@ -33,7 +33,10 @@ transpose (V4 (V4 a00 a01 a02 a03)
 --                (V4 0 1 0 0)
 --                (V4 0 0 1 0)
 --                (V4 0 0 0 1)) = m0
-(||*||) m0 = fmap (\d -> foldl (|+|) origin $ vecZip (*|) d m0)
+(||*||) m0 = fmap (m0 ||*|)
+
+(||*|) :: (Vector v0, Vector v1, Num a) => v0 (v1 a) -> v0 a -> v1 a
+(||*|) m0 v = foldl (|+|) origin $ vecZip (*|) v m0
 
 invert :: Matrix4 a -> Matrix4 a
 invert _ = undefined -- TODO

@@ -5,23 +5,37 @@ module OpalFalcon.Material
 where
 
 import Control.Monad.Random
-import Debug.Trace
 import GHC.Float (double2Float, float2Double)
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Lighting (cosWeightedDir)
+import OpalFalcon.Math.Vector
 
 -- Material with purely diffuse reflectivity
 mkDiffuseMat :: ColorRGBf -> Vec3d -> AppliedMaterial
 mkDiffuseMat refl norm =
-  mkSchlickMat
-    SchlickMat
-      { schlickSpecularReflectance = refl,
-        schlickRoughness = 0.999,
-        schlickIsotropy = 1.0
-      }
-    norm
-    (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
+  let brdf _ _ = refl |/ pi
+      xmitRay _ _ = return RayTerm
+      xmitPhoton iDir = do
+        rrRand <- getRandom -- Russian-Roulette the surface reflectance
+        if rrRand >= (vecAvgComp refl)
+          then return PhotonAbsorb
+          else do
+            oDir <- cosWeightedDir norm
+            return $ PhotonStore oDir refl
+   in AppliedMaterial
+        { transmitRay = xmitRay,
+          transmitPhoton = xmitPhoton,
+          photonBrdf = brdf
+        }
+
+--   mkSchlickMat
+--     SchlickMat
+--       { schlickSpecularReflectance = refl,
+--         schlickRoughness = 0.999,
+--         schlickIsotropy = 1.0
+--       }
+--     norm
+--     (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
 
 -- Material with purely specular reflectivity
 mkSimpleMat :: ColorRGBf -> Vec3d -> AppliedMaterial
@@ -131,6 +145,8 @@ mkSchlickMat
                 else
                   let oDir = reflect iDir norm
                    in return $ RayPass oDir $ brdf True iDir oDir
+        -- Since all reflections are specular, the "reflectance" we return back is just the specular reflectance
+        -- TODO: We may have to compensate for the geometry term for glossy reflections
         xmitPhoton iDir = do
           rrRand <- getRandom -- Russian-Roulette the surface reflectance
           if rrRand >= (vecAvgComp f0)
@@ -142,16 +158,16 @@ mkSchlickMat
                   -- Glossy
                   hVec <- schlickRandomGlossyHalfVec mat norm grainDir
                   let oDir = reflect iDir hVec
-                   in return $ PhotonPass oDir $ brdf False iDir oDir
+                   in return $ PhotonPass oDir f0
                 else
                   if randVal < reflGlossy + reflDiffuse
                     then do
                       -- Diffuse:
                       oDir <- cosWeightedDir norm
-                      return $ PhotonStore oDir $ brdf False iDir oDir
+                      return $ PhotonStore oDir f0
                     else
                       let oDir = reflect iDir norm -- Specular
-                       in return $ PhotonPass oDir $ brdf True iDir oDir
+                       in return $ PhotonPass oDir f0
      in AppliedMaterial
           { transmitRay = xmitRay,
             transmitPhoton = xmitPhoton,

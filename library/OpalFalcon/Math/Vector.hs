@@ -92,6 +92,14 @@ gray = constVec
 black :: (Num a) => Vec3 a
 black = constVec (fromInteger 0)
 
+xAxis :: (Num a) => Vec3 a
+yAxis :: (Num a) => Vec3 a
+zAxis :: (Num a) => Vec3 a
+
+xAxis = (V3 1 0 0)
+yAxis = (V3 0 1 0)
+zAxis = (V3 0 0 1)
+
 xPos :: Vec3 a -> a
 yPos :: Vec3 a -> a
 zPos :: Vec3 a -> a
@@ -161,7 +169,9 @@ vecAverage l =
             0 -> origin
             _ -> (vecSum l) |* (1.0 / (fromInteger $ toInteger $ len))
 vecAvgComp :: (Vector a, Fractional b) => a b -> b
-vecAvgComp v = (foldl (+) 0 v) / (fromInteger $ toInteger $ length v)
+vecAvgComp v = (vecCompSum v) / (fromInteger $ toInteger $ length v)
+vecCompSum :: (Vector a, Num b) => a b -> b
+vecCompSum = foldl (+) 0
 -- Normalize
 normalize :: (Vector a, Eq b, Floating b) => a b -> a b
 normalize v = if v |==| origin then origin else fmap ( / (mag v)) v
@@ -237,3 +247,7 @@ fromSphere (V3 r theta psi) = (V3 x y z)
           y = r*sinth*(sin psi)
           z = r*(cos theta)
           sinth = sin theta
+
+-- Gets a vector orthagonal to the provided vector
+getOrthoVec :: (Floating b, Eq b) => Vec3 b -> Vec3 b
+getOrthoVec v = normalize $ v |><| (if v |==| xAxis then yAxis else xAxis)

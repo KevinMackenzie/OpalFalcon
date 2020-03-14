@@ -35,11 +35,11 @@ cullCylinder dir r h pos x
 --  up to a maximum distance before giving up.
 estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> (Vec3d -> Vec3d -> ColorRGBf) -> Vec3d -> ColorRGBf
 estimateRadiance pmap pCount hpos incDir maxDist brdf norm = 
-    let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.01*maxDist) hpos) hpos maxDist
+    let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.001*maxDist) hpos) hpos maxDist
         pts = map (\(Photon pos _ _ _) -> pos) photons
-        r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
-        area = if r2 == 0 then Nothing else Just $ pi*r2
-        -- area = ((\x -> if x == 0 then trace ("Hit at (" ++ (show hpos) ++ ") wiht norm (" ++ (show norm) ++ ") and " ++ (show $ length pts) ++ " photons") x else x) . double2Float) <$> convexHullArea pts norm
+        -- r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
+        -- area = if r2 == 0 then Nothing else Just $ pi*r2
+        area = ((\x -> if x == 0 then trace ("Hit at (" ++ (show hpos) ++ ") wiht norm (" ++ (show norm) ++ ") and " ++ (show $ length pts) ++ " photons") x else x) . double2Float) <$> convexHullArea pts norm
         r = case area of
             Nothing -> black -- No area means no photons or not enough
             Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (brdf inc incDir)) |+| c) black photons)
