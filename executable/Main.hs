@@ -190,11 +190,14 @@ main =
       -- (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
       -- fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
       do
-        phs <- evalRandIO $ areaPhotonShoot cornellBox ((50 / 255) *| wht) 50000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5)
+        phs <- evalRandIO $ areaPhotonShoot cornellBox ((50 / 255) *| wht) 10000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5)
         pmap <- return $ ((mkKdTree phs) :: PhotonMap)
-        pixs <- return $ renderIlluminance (gil pmap 500 0.5) cornellBox cam h
+        pixs <- return $ renderIlluminance (gil pmap 300 0.5) cornellBox cam h
+        -- pts <- evalRandIO $ replicateM 10000 (cosWeightedDir (V3 (1) 0 0))
+        -- fb <- return $ renderPhotons cornellBox cam h $ map (\v -> Photon v (constVec 0.1) origin XAxis) pts
         -- pixs <- evalRandIO $ pathTraceScene (PathTracer {globalIllum = gil pmap 500 1.0}) cornellBox h cam
         -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
+        -- print $ take 30 pts
         -- saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
         -- print $ map (unpackDir) [0..65535]
         saveToPngRtr "pngfile.png" pixs w h

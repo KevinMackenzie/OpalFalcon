@@ -249,5 +249,5 @@ fromSphere (V3 r theta psi) = (V3 x y z)
           sinth = sin theta
 
 -- Gets a vector orthagonal to the provided vector
-getOrthoVec :: (Floating b, Eq b) => Vec3 b -> Vec3 b
-getOrthoVec v = normalize $ v |><| (if v |==| xAxis then yAxis else xAxis)
+getOrthoVec :: (Ord b, Floating b) => Vec3 b -> Vec3 b
+getOrthoVec v = normalize $ v |><| (if (mag (v |><| xAxis)) < 0.001 then yAxis else xAxis)
