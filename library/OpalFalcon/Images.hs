@@ -26,5 +26,5 @@ saveToPngRtr p l w h =
 saveToPngPmap :: String -> [ColorRGBf] -> Int -> Int -> IO ()
 saveToPngPmap p l w h = 
     let pixs = V.fromList $ map (((\(V3 x y z) -> PixelRGB8 x y z) . toPixel) :: (ColorRGBf -> PixelRGB8)) l
-        bs = encodePng $ generateImage (\x y -> pixs V.! ((h-1-y)*w+(x))) w h
+        bs = encodePng $ generateImage (\x y -> pixs V.! (y*w+(w-1-x))) w h
     in do Bs.writeFile p bs
