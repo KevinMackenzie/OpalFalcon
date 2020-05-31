@@ -1,5 +1,6 @@
 module OpalFalcon.Material
   ( mkDiffuseMat,
+    mkDiffuseMatSchlick,
     mkSimpleMat,
   )
 where
@@ -28,14 +29,16 @@ mkDiffuseMat refl norm =
           photonBrdf = brdf
         }
 
---   mkSchlickMat
---     SchlickMat
---       { schlickSpecularReflectance = refl,
---         schlickRoughness = 0.999,
---         schlickIsotropy = 1.0
---       }
---     norm
---     (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
+mkDiffuseMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkDiffuseMatSchlick refl norm = 
+  mkSchlickMat
+    SchlickMat
+      { schlickSpecularReflectance = refl,
+        schlickRoughness = 0.999,
+        schlickIsotropy = 1.0
+      }
+    norm
+    (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
 
 -- Material with purely specular reflectivity
 mkSimpleMat :: ColorRGBf -> Vec3d -> AppliedMaterial
