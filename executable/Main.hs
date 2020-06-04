@@ -64,11 +64,13 @@ cornellBox = MkScene
     llb = V3 (-0.5) 1.999 (-0.5)
     lrf = V3 0.5 1.999 0.5
     lrb = V3 0.5 1.999 (-0.5)
-    diffT d t _ = mkDiffuseMat d (normalize $ triangleNorm t)
+    diffT d t _ = mkDiffuseMatSchlick d (normalize $ triangleNorm t)
     leftMat = diffT (V3 1 0 0)
     rightMat = diffT (V3 0 0 1)
     blankMat = diffT (V3 0.84 0.84 0.84)
     lightMat = diffT (V3 0 0 0)
+    reflMat d t _ = mkSimpleMat d (normalize $ triangleNorm t)
+    boxMat = reflMat (V3 1 1 1)
     left0 = mkTriangleObject (MkTriangle vlbf vlbb vltb) leftMat
     left1 = mkTriangleObject (MkTriangle vlbf vltb vltf) leftMat
     right0 = mkTriangleObject (MkTriangle vrbf vrtb vrbb) rightMat
@@ -82,7 +84,7 @@ cornellBox = MkScene
     light0 = mkTriangleObject (MkTriangle lrb lrf llf) lightMat
     light1 = mkTriangleObject (MkTriangle llf llb lrb) lightMat
     sphre = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (sphereMat (V3 0.9 0.9 0.6))
-    qp0 = mkQuadPrism (V3 (-0.5) (-1) (-0.6)) (normalize $ V3 3 0 (-1)) yAxis (normalize $ V3 1 0 3) (V3 0.5 1 0.5) blankMat
+    qp0 = mkQuadPrism (V3 (-0.5) (-1) (-0.6)) (normalize $ V3 3 0 (-1)) yAxis (normalize $ V3 1 0 3) (V3 0.5 1 0.5) boxMat
     qp1 = mkQuadPrism (V3 1 (-1.5) 1) (normalize $ V3 3 0 1) yAxis (normalize $ V3 (-1) 0 3) (V3 0.75 0.5 0.75) blankMat
 
 sph :: Object
@@ -190,14 +192,16 @@ main =
       -- (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
       -- fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
       do
-        phs <- evalRandIO $ areaPhotonShoot cornellBox ((50 / 255) *| wht) 10000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5)
+        phs <- evalRandIO $ areaPhotonShoot cornellBox ((50 / 255) *| wht) 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5)
+        -- fb <- return $ renderPhotons cornellBox cam h phs
         pmap <- return $ ((mkKdTree phs) :: PhotonMap)
-        pixs <- return $ renderIlluminance (gil pmap 300 0.5) cornellBox cam h
-        -- pts <- evalRandIO $ replicateM 10000 (cosWeightedDir (V3 (1) 0 0))
-        -- fb <- return $ renderPhotons cornellBox cam h $ map (\v -> Photon v (constVec 0.1) origin XAxis) pts
+        pixs <- return $ renderIlluminance (gil pmap 100 0.5) cornellBox cam h
+        -- pts <- evalRandIO $ replicateM 1000000 (cosWeightedDir (V3 0 0 1))
+        -- pts <- evalRandIO $ replicateM 1000000 (uniformHemisphere (V3 0 0 1.0))
+        -- fb <- return $ renderPhotons cornellBox cam h $ map (\v -> Photon v (constVec 0.001) origin XAxis) pts
         -- pixs <- evalRandIO $ pathTraceScene (PathTracer {globalIllum = gil pmap 500 1.0}) cornellBox h cam
         -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
-        -- print $ take 30 pts
-        -- saveToPngPmap "pmap.png" (fbPixelList fb) (fbWidth fb) (fbHeight fb)
+        -- print $ map mag $ take 30 pts
+        -- saveToPngPmap "pmap.png" ((10 *|) <$> (fbPixelList fb)) (fbWidth fb) (fbHeight fb)
         -- print $ map (unpackDir) [0..65535]
         saveToPngRtr "pngfile.png" pixs w h
