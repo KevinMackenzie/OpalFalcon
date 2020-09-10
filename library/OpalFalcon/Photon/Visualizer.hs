@@ -37,6 +37,7 @@ renderPhotons' sc cam px phs =
       phs' = filter (occludePhoton sc (cameraPos cam)) phs
    in map (tf postCull) $ filter (cullPhoton cam) $ map (tf preCull) phs'
 
+-- TODO: Something about this is broken (the camera is too zoomed in or something)
 renderPhotons :: (ObjectCollection o) => Scene o -> Camera -> Integer -> [Photon] -> FrameBuffer
 renderPhotons sc cam px phs = rasterPhotons (cameraFrameBlank cam px) $ renderPhotons' sc cam px phs
 

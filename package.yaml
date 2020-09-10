@@ -30,6 +30,8 @@ library:
   - JuicyPixels
   - random
   - MonadRandom
+  - parallel
+  - threads
   source-dirs: library
 
 executables:
@@ -43,9 +45,9 @@ executables:
     - array
     - MonadRandom
     ghc-options:
-    - -rtsopts
+#    - -rtsopts
     - -threaded
-    - -with-rtsopts=-N
+#    - -with-rtsopts=-N
 
 benchmarks:
   OpalFalcon-benchmarks:

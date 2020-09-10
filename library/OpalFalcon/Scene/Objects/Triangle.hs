@@ -5,6 +5,7 @@ module OpalFalcon.Scene.Objects.Triangle
     trianglePos,
     hittestTriangleFront,
     hittestTriangle,
+    pointInTriangle,
   )
 where
 
@@ -39,7 +40,7 @@ hittestTriangle t@(MkTriangle v0 v1 v2) mat r@(Ray rPos rDir) =
       d = n |.| v0 -- the constant offset of the implicit plane function
       dDir = n |.| rDir
       dPos = n |.| rPos
-      p = -(dPos - d) / dDir -- NOTE: This differs from the above implementation
+      p = - (dPos - d) / dDir -- NOTE: This differs from the above implementation
       hPos = pointAtParameter r p
       vc0 = (v1 |-| v0) |><| (hPos |-| v0)
       vc1 = (v2 |-| v1) |><| (hPos |-| v1)
@@ -56,3 +57,12 @@ hittestTriangle t@(MkTriangle v0 v1 v2) mat r@(Ray rPos rDir) =
             hitParam = p,
             hitMat = mat t (V3 u v w)
           }
+
+-- The point doesn't have to be on the triangle (can be above / below)
+{-# INLINE pointInTriangle #-}
+pointInTriangle :: Triangle -> Vec3d -> Bool
+pointInTriangle (MkTriangle p0 p1 p2) pt =
+  let v0 = p1 |-| p0
+      v1 = p2 |-| p0
+      v2 = p2 |-| p1
+   in (v2 |><| (pt |-| p1)) |.| (v0 |><| v1) > 0

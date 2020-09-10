@@ -29,9 +29,11 @@ import OpalFalcon.Scene.Objects.PointLight
 import OpalFalcon.Scene.Objects.Sphere
 import OpalFalcon.Scene.Objects.Triangle
 import OpalFalcon.Util.Random
-import OpalFalcon.XTracing.PathTracer
+-- import OpalFalcon.XTracing.PathTracer
+import OpalFalcon.XTracing.RayTracer
 import OpalFalcon.XTracing.XTracer
 import System.Random
+import System.Environment
 
 mkQuadPrism pos xDir yDir zDir (V3 sx sy sz) mat =
   let pts@[lbb, lbf, ltb, ltf, rbb, rbf, rtb, rtf] =
@@ -49,7 +51,11 @@ cornellBox = MkScene
   { objects = MkObjList
       { objList = [left0, left1, right0, right1, top0, top1, bottom0, bottom1, back0, back1, light0, light1] ++ qp0 ++ qp1
       },
-    lightSources = []
+    lightSources =
+      [ --mkDiscLight (MkDisc dPlane 0.75) whitef 25
+        mkTriangleLight light0Tri whitef 25,
+        mkTriangleLight light1Tri whitef 25
+      ]
   }
   where
     vlbf = V3 (-2) (-2) 2
@@ -64,13 +70,13 @@ cornellBox = MkScene
     llb = V3 (-0.5) 1.999 (-0.5)
     lrf = V3 0.5 1.999 0.5
     lrb = V3 0.5 1.999 (-0.5)
-    diffT d t _ = mkDiffuseMatSchlick d (normalize $ triangleNorm t)
+    diffT d t _ = mkDiffuseMat d (normalize $ triangleNorm t)
     leftMat = diffT (V3 1 0 0)
     rightMat = diffT (V3 0 0 1)
     blankMat = diffT (V3 0.84 0.84 0.84)
     lightMat = diffT (V3 0 0 0)
-    reflMat d t _ = mkSimpleMat d (normalize $ triangleNorm t)
-    boxMat = reflMat (V3 1 1 1)
+    reflMat d t _ = mkSpecularMat d (normalize $ triangleNorm t)
+    boxMat = reflMat (V3 0.7 0.7 1)
     left0 = mkTriangleObject (MkTriangle vlbf vlbb vltb) leftMat
     left1 = mkTriangleObject (MkTriangle vlbf vltb vltf) leftMat
     right0 = mkTriangleObject (MkTriangle vrbf vrtb vrbb) rightMat
@@ -81,8 +87,10 @@ cornellBox = MkScene
     bottom1 = mkTriangleObject (MkTriangle vrbf vlbb vlbf) blankMat
     back0 = mkTriangleObject (MkTriangle vrtb vltb vlbb) blankMat
     back1 = mkTriangleObject (MkTriangle vrtb vlbb vrbb) blankMat
-    light0 = mkTriangleObject (MkTriangle lrb lrf llf) lightMat
-    light1 = mkTriangleObject (MkTriangle llf llb lrb) lightMat
+    light0Tri = MkTriangle lrb lrf llf
+    light1Tri = MkTriangle llf llb lrb
+    light0 = mkTriangleObject light0Tri lightMat
+    light1 = mkTriangleObject light1Tri lightMat
     sphre = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (sphereMat (V3 0.9 0.9 0.6))
     qp0 = mkQuadPrism (V3 (-0.5) (-1) (-0.6)) (normalize $ V3 3 0 (-1)) yAxis (normalize $ V3 1 0 3) (V3 0.5 1 0.5) boxMat
     qp1 = mkQuadPrism (V3 1 (-1.5) 1) (normalize $ V3 3 0 1) yAxis (normalize $ V3 (-1) 0 3) (V3 0.75 0.5 0.75) blankMat
@@ -97,7 +105,7 @@ ol :: ObjectList
 
 sc :: Scene ObjectList
 
-sphereMat refl (MkSphere s _) hp = mkSimpleMat refl (normalize (hp |-| (affineTranslate s)))
+sphereMat refl (MkSphere s _) hp = mkSpecularMat refl (normalize (hp |-| (affineTranslate s)))
 
 planeMat refl (MkPlane (V4 _ _ n _)) _ = mkDiffuseMat refl (fromHomo n)
 
@@ -109,7 +117,7 @@ sph1 = mkSphereObject (MkSphere (mkAffineSpace (V3 2 1.3 (-2)) xAxis yAxis zAxis
 
 ground = mkPlaneObject (MkPlane (mkAffineSpace (V3 0 (-2) 0) xAxis (negateVec zAxis) yAxis)) (planeMat (V3 0.5 0.5 0.5))
 
-dPlane = MkPlane (mkAffineSpace (V3 (-2) 4 (-2)) xAxis zAxis (negateVec yAxis))
+dPlane = MkPlane (mkAffineSpace (V3 0 1.998 0) xAxis zAxis (negateVec yAxis))
 
 disc = mkDiscObject (MkDisc dPlane 2) (discMat (V3 0.4 0.6 0.6))
 
@@ -164,16 +172,16 @@ repeatMF :: (Monad m) => Integer -> m a -> m [a]
 repeatMF 0 f = return []
 repeatMF c f = do
   v <- f
-  (v :) <$> (repeatMF (c-1) f)
+  (v :) <$> (repeatMF (c -1) f)
 
-areaPhotonShoot :: (Monad m, RandomGen g, ObjectCollection o) => Scene o -> ColorRGBf -> Int -> Vec3d -> Vec3d -> Vec3d -> RandT g m [Photon]
-areaPhotonShoot sc pow cnt pos x2 y2 =
+areaPhotonShoot :: (Monad m, RandomGen g, ObjectCollection o) => Scene o -> ColorRGBf -> Int -> Vec3d -> Vec3d -> Vec3d -> Int -> RandT g m [Photon]
+areaPhotonShoot sc pow cnt pos x2 y2 minBounce =
   let norm = normalize $ x2 |><| y2
    in do
         dirs <- repeatMF (toInteger cnt) $ cosWeightedDir norm
         xs <- (fmap (\a -> (2 * a -1) *| x2)) <$> getRandoms
         ys <- (fmap (\a -> (2 * a -1) *| y2)) <$> getRandoms
-        concat <$> (mapM (\((d, x, y) :: (Vec3d, Vec3d, Vec3d)) -> shootPhoton 0 sc (EPhoton (Ray (pos |+| x |+| y) d) (pow |/ (fromIntegral cnt)))) $ take cnt $ zip3 dirs xs ys)
+        concat <$> (mapM (\((d, x, y) :: (Vec3d, Vec3d, Vec3d)) -> shootPhoton minBounce sc (EPhoton (Ray (pos |+| x |+| y) d) (pow |/ (fromIntegral cnt)))) $ take cnt $ zip3 dirs xs ys)
 
 main :: IO ()
 main =
@@ -181,27 +189,38 @@ main =
       h = 200
       -- pixs = pathTraceScene (globIllum pmap 200 1.0) (mkStdGen 0x1337beef) cornellBox cam h
       gil pmap pcount maxDist pos inc norm brdf = estimateRadiance pmap pcount pos inc maxDist brdf norm
+      yesglil p = gil p 500 0.5
+      noglil p _ _ _ _ = black
       -- ptrcr = PathTracer {globalIllum = gil pmap 200 1.0}
       -- pixs = pathTraceScene ptrcr cornellBox h cam
       -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
       cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 75, cameraAspect = 1}
       incand = (V3 255 214 170)
       wht = constVec 255
+      lightPow = ((50 / 255) *| wht)
    in -- (phs',cnt) = collectPhotons pmap 30000 (V3 (-2) 0 0) 2
       -- (phs1,cnt1) = collectPhotons pmap 30000 (V3 0 0 (-2)) 2
       -- (phs2,cnt2) = collectPhotons pmap 30000 (V3 0 (-2) 0) 2
       -- fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
       do
-        phs <- evalRandIO $ areaPhotonShoot cornellBox ((50 / 255) *| wht) 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5)
-        -- fb <- return $ renderPhotons cornellBox cam h phs
+        args <- getArgs
+        phs <- evalRandIO $ areaPhotonShoot cornellBox lightPow 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5) 1 -- only indirect lighting
         pmap <- return $ ((mkKdTree phs) :: PhotonMap)
-        pixs <- return $ renderIlluminance (gil pmap 100 0.5) cornellBox cam h
-        -- pts <- evalRandIO $ replicateM 1000000 (cosWeightedDir (V3 0 0 1))
-        -- pts <- evalRandIO $ replicateM 1000000 (uniformHemisphere (V3 0 0 1.0))
-        -- fb <- return $ renderPhotons cornellBox cam h $ map (\v -> Photon v (constVec 0.001) origin XAxis) pts
-        -- pixs <- evalRandIO $ pathTraceScene (PathTracer {globalIllum = gil pmap 500 1.0}) cornellBox h cam
-        -- putStr $ foldl (\x y -> x ++ "\n" ++ (show y)) "" $ take 10 $ phs;
-        -- print $ map mag $ take 30 pts
-        -- saveToPngPmap "pmap.png" ((10 *|) <$> (fbPixelList fb)) (fbWidth fb) (fbHeight fb)
-        -- print $ map (unpackDir) [0..65535]
+        -- fb <- return $ renderPhotons cornellBox cam h phs
+        -- pixs <- return $ renderIlluminance (gil pmap 100 0.5) cornellBox cam h
+        -- print $ take 30 $ map (\(Photon pos col dir _) -> 100*|col) phs
+        -- print $ length phs
+        -- print $ length $ filter (\c -> (mag c) > 0) $ fbPixelList fb
+        -- saveToPngPmap "pmap.png" ((100 *|) <$> (fbPixelList fb)) (fbWidth fb) (fbHeight fb)
+        -- print $ splitList 10 [1..100]
+        pixs <- rayTraceScene (read $ args !! 0) (RayTracer {globalIllum = yesglil pmap}) cornellBox h cam
+        -- print $ length pixs
         saveToPngRtr "pngfile.png" pixs w h
+
+-- TODO: list
+-- Force stuff like luminance, radiance, etc. into type system to reduce mistakes; can we derive via?
+--  X. Triangle-light w/ random sampling for shadows
+--  2. support scattering in applied material (output dir & position)
+--  3. Add simple participating media
+--  4. Use shoot photons in parallel (i.e. worker threads take chunks of work); I HAVE ACCESS TO PARALLEL.ecse still
+--  ?. Support refraction by only accepting back-side hits (assume closed triangle meshes)

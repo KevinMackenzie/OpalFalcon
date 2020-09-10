@@ -6,6 +6,18 @@ import Control.Monad.Random
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
 
+-- These use the current position as the origin of the two vectors (so incoming vectors are "flipped")
+--           lInDir   lOutDir  3-band distribution
+newtype Brdf = Brdf (Vec3d -> Vec3d -> ColorRGBf)
+
+-- A BRDF with the "lOutDir" alrady applied
+newtype RayBrdf = RayBrdf (Vec3d -> ColorRGBf)
+
+--                lInDir   lOutDir  3-band distribution
+newtype PhaseFunc = PhaseFunc (Vec3d -> Vec3d -> ColorRGBf)
+
+mkRayBrdf (Brdf brdf) rayIncDir = RayBrdf $ flip brdf rayIncDir
+
 data Hit
   = MkHit
       { hitPos :: Vec3d,
@@ -25,8 +37,20 @@ data Object
         objIntersectRay :: Ray -> Maybe Hit
       }
 
-data RayTransmitResult = RayPass Vec3d ColorRGBf | RayTerm
-data PhotonTransmitResult = PhotonPass Vec3d ColorRGBf | PhotonStore Vec3d ColorRGBf | PhotonAbsorb
+-- Hit types; eye is implied
+data HitType = HDiff | HSpec | HLight
+
+-- The ray path in reverse order (head is the previous bounce)
+type Path = [HitType]
+
+data RayTransmitResult
+  = RayPass Vec3d ColorRGBf
+  | RayTerm
+
+data PhotonTransmitResult
+  = PhotonPass Vec3d ColorRGBf
+  | PhotonStore Vec3d ColorRGBf
+  | PhotonAbsorb
 
 -- The concept is it is an arbitrary material applied to the parameter
 --  of a hit for a specific object.  This lets us avoid having
@@ -40,12 +64,22 @@ data AppliedMaterial
         -- Reflects a photon from a provided incoming direction.  Used in a russian-roulette method
         transmitPhoton :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m PhotonTransmitResult),
         -- The BRDF used when estimating irradiance from photon map
-        photonBrdf :: Vec3d -> Vec3d -> ColorRGBf
+        photonBrdf :: Brdf
       }
 
 -- Provides function to sample light source from a point in the scene
 --   This is only good for lambertian surfaces
-data LightSource = MkLight { lightSample :: (Ray -> Maybe Hit) -> Vec3d -> ColorRGBf }
+data LightSource
+  = MkLight
+      { lightSample ::
+          ( forall g m.
+            (Monad m, RandomGen g) =>
+            (Ray -> Maybe Hit) -> -- hit func
+            RayBrdf -> -- brdf with inc dir applied
+            Vec3d -> -- position of sample
+            RandT g m ColorRGBf -- Total outgoing radiance contribution from this light source
+          )
+      }
 
 -- We don't really want to define `Ord` over Hits
 closerHit :: Vec3d -> Maybe Hit -> Maybe Hit -> Maybe Hit

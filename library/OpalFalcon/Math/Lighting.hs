@@ -1,20 +1,24 @@
+{-# LANGUAGE BangPatterns #-}
+
 module OpalFalcon.Math.Lighting
   ( attenuate,
     attenuateVec,
     cosWeightedDir,
     uniformDir,
     uniformHemisphere,
+    uniformTri,
   )
 where
 
 import Control.Monad.Random
 import OpalFalcon.Math.Matrix
 import OpalFalcon.Math.Vector
+import OpalFalcon.Scene.Objects.Triangle (Triangle (..), pointInTriangle)
 
 attenuate :: (Vector a, Floating b) => b -> a b -> a b -> b
 attenuate c p0 p1 =
   let r = distance p0 p1
-   in c / (r * r)
+   in c / (4 * pi * r * r)
 
 attenuateVec :: (Vector a, Vector b, Floating c) => a c -> b c -> b c -> a c
 attenuateVec v p0 p1 = fmap (\x -> attenuate x p0 p1) v
@@ -35,3 +39,12 @@ uniformDir = getRandom
 
 uniformHemisphere :: (Monad m, RandomGen g, Random c, Floating c, Ord c) => Vec3 c -> RandT g m (Vec3 c)
 uniformHemisphere norm = (clampHemisphere norm) <$> uniformDir
+
+-- Source: https://mathworld.wolfram.com/TrianglePointPicking.html
+uniformTri :: (Monad m, RandomGen g) => Triangle -> RandT g m Vec3d
+uniformTri t@(MkTriangle p0 p1 p2) =
+  do
+    r0 <- getRandom
+    r1 <- getRandom
+    let !pt = (r0 *| (p1 |-| p0)) |+| (r1 *| (p2 |-| p0)) |+| p0
+     in if pointInTriangle t pt then return pt else uniformTri t

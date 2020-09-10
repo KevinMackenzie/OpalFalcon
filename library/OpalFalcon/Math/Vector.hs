@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE BangPatterns #-}
 module OpalFalcon.Math.Vector where
 
 import Data.Word (Word8)
@@ -14,7 +15,7 @@ constVec :: Vector a => b -> a b
 constVec = pure
 
 vecZip :: Vector a => (b -> c -> d) -> a b -> a c -> a d
-vecZip = liftA2
+vecZip f !v0 !v1 = liftA2 f v0 v1
 
 -- Arithmetic operations on vectors
 (|+|) :: (Vector a, Num b) => a b -> a b -> a b
@@ -32,7 +33,7 @@ vecZip = liftA2
 -- Used to see if two vectors are approximately equal to 
 --  handle floating-point errors
 approxEq :: (Vector a, Ord b, Fractional b) => b -> a b -> a b -> Bool
-approxEq e v0 v1 = foldr (&&) True $ liftA2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
+approxEq e v0 v1 = foldl (&&) True $ liftA2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
 
 (|==|) :: (Vector a, Eq b) => a b -> a b -> Bool
 (|==|) x y = foldl (&&) True $ vecZip (==) x y
@@ -138,7 +139,7 @@ mutZ (V3 x y _) z = V3 x y z
 (|/) v s = fmap (/s) v
 -- Dot product
 (|.|) :: (Vector a, Num b) => a b -> a b -> b
-(|.|) v0 v1 = foldr (+) 0 $ v0 |*| v1
+(|.|) v0 v1 = foldl (+) 0 $ v0 |*| v1
 -- Negate
 negateVec :: (Vector a, Num b) => a b -> a b
 negateVec = fmap negate
@@ -157,10 +158,10 @@ distance2 :: (Vector a, Num b) => a b -> a b -> b
 distance2 v0 v1 = foldl (+) 0 $ fmap (^2) $ v0 |-| v1
 -- Magnitude
 mag :: (Vector a, Floating b) => a b -> b
-mag v = sqrt $ foldr (+) 0 $ v |*| v
+mag v = sqrt $ foldl (+) 0 $ v |*| v
 -- Sum
 vecSum :: (Vector a, Fractional b, Foldable c) => c (a b) -> a b
-vecSum = foldr (|+|) origin
+vecSum = foldl (|+|) origin
 -- Average
 vecAverage :: (Vector a, Fractional b, Foldable c) => c (a b) -> a b
 vecAverage l = 

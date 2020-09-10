@@ -1,7 +1,8 @@
 module OpalFalcon.Material
   ( mkDiffuseMat,
+    mkSpecularMat,
     mkDiffuseMatSchlick,
-    mkSimpleMat,
+    mkSpecularMatSchlick,
   )
 where
 
@@ -26,23 +27,33 @@ mkDiffuseMat refl norm =
    in AppliedMaterial
         { transmitRay = xmitRay,
           transmitPhoton = xmitPhoton,
-          photonBrdf = brdf
+          photonBrdf = Brdf brdf
         }
 
 mkDiffuseMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
-mkDiffuseMatSchlick refl norm = 
+mkDiffuseMatSchlick refl norm =
   mkSchlickMat
     SchlickMat
       { schlickSpecularReflectance = refl,
-        schlickRoughness = 0.999,
+        schlickRoughness = 0.999999,
         schlickIsotropy = 1.0
       }
     norm
     (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
 
+mkSpecularMat :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkSpecularMat refl norm =
+  let xmitRay iDir _ = return $ RayPass (reflect iDir norm) refl
+      xmitPhoton iDir = return $ PhotonPass (reflect iDir norm) refl
+   in AppliedMaterial
+        { transmitRay = xmitRay,
+          transmitPhoton = xmitPhoton,
+          photonBrdf = Brdf (\_ _ -> black)
+        }
+
 -- Material with purely specular reflectivity
-mkSimpleMat :: ColorRGBf -> Vec3d -> AppliedMaterial
-mkSimpleMat refl norm =
+mkSpecularMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkSpecularMatSchlick refl norm =
   mkSchlickMat
     SchlickMat
       { schlickSpecularReflectance = refl,
@@ -174,5 +185,5 @@ mkSchlickMat
      in AppliedMaterial
           { transmitRay = xmitRay,
             transmitPhoton = xmitPhoton,
-            photonBrdf = brdf False -- \i o -> let c = brdf False i o in trace ((show i) ++ "'-,-'" ++ (show o) ++ "==>" ++ (show c)) c
+            photonBrdf = Brdf $ brdf False -- \i o -> let c = brdf False i o in trace ((show i) ++ "'-,-'" ++ (show o) ++ "==>" ++ (show c)) c
           }

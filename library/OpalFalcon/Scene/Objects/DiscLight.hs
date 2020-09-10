@@ -1,28 +1,30 @@
-module OpalFalcon.Scene.Objects.DiscLight (
-    DiscLight(MkDL),
-    sampleDiscLight
-    ) where
+module OpalFalcon.Scene.Objects.DiscLight
+  ( DiscLight (MkDL),
+    sampleDiscLight,
+  )
+where
 
+import Control.Monad.Random
+import Data.Bits
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray
-import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Matrix
+import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
-import OpalFalcon.Scene.Objects.PointLight
+import OpalFalcon.Math.Vector
 import OpalFalcon.Scene.Objects.Disc
 import OpalFalcon.Scene.Objects.Plane
-
-import Data.Bits
+import OpalFalcon.Scene.Objects.PointLight
+import System.Random
 
 data DiscLight = MkDL Disc ColorRGBf Float
 
--- Generates points on an (sxs) square centered at the origin; TODO: use RNG
+-- Generates points on an (sxs) square centered at the origin; TODO: jitter
 generateSquarePoints :: Double -> Integer -> [Vec2d]
-generateSquarePoints s c = 
-    let offset = s / (fromInteger c) 
-        c2 = shiftR c 2
-        cSet = map (\x -> offset * (1+2*(fromInteger x))) [-c2..(c2-1)]
-    in  [V2 x y | x <- cSet, y <- cSet]
+generateSquarePoints s c =
+  let offset = s / (fromInteger c)
+      c2 = shiftR c 2
+      cSet = map (\x -> offset * (1 + 2 * (fromInteger x))) [- c2 .. (c2 -1)]
+   in [V2 x y | x <- cSet, y <- cSet]
 
 generateUnitDiscPoints :: Integer -> [Vec2d]
 generateUnitDiscPoints c = filter (((>) 1.0) . mag) $ generateSquarePoints 2.0 c
@@ -42,7 +44,6 @@ generateDiscPoints d c = map (transformDiscPoint d) $ generateUnitDiscPoints c
 
 -- Instead of light sampling, is there any reason we couldn't do penumbra calculations analytically?
 
-sampleDiscLight :: Integer -> DiscLight -> (Ray -> Maybe Hit) -> Vec3d -> ColorRGBf
-sampleDiscLight c (MkDL lDisc lCol lPow) probe oPos = vecAverage $
-    map (\x -> samplePointLight (MkPL x lCol lPow) probe oPos) $ generateDiscPoints lDisc c
-
+sampleDiscLight :: (Monad m, RandomGen g) => Integer -> DiscLight -> (Ray -> Maybe Hit) -> RayBrdf -> Vec3d -> RandT g m ColorRGBf
+sampleDiscLight c (MkDL lDisc lCol lPow) probe brdf oPos =
+  vecAverage <$> (mapM (\x -> samplePointLight (MkPL x lCol (lPow / (fromInteger c))) probe brdf oPos) $ generateDiscPoints lDisc c)

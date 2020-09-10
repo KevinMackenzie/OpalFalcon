@@ -11,12 +11,6 @@ import OpalFalcon.XTracing.RayTraceUtils
 import OpalFalcon.XTracing.XTracer
 import System.Random
 
--- Path representation
-data PathTypes = PDiff | PSpec | PGloss
-
--- The ray path in reverse order (head is the previous bounce)
-type Path = [PathTypes]
-
 numBounces :: Path -> Int
 numBounces = length
 
@@ -46,5 +40,5 @@ pathTraceScene pt sc height cam =
                   rayResult <- transmitRay m iDir black
                   case rayResult of
                     RayTerm -> return $ glob pos iDir norm (photonBrdf m)
-                    RayPass oDir refl -> (refl |*|) <$> (shootRay (Ray (pos |+| (ptEpsilon *| oDir)) oDir) (PGloss : path))
+                    RayPass oDir refl -> (refl |*|) <$> (shootRay (Ray (pos |+| (ptEpsilon *| oDir)) oDir) (HSpec : path))
    in mapM (\(n, x) -> shootRay x []) $ zip [1 ..] $ genRays cam height

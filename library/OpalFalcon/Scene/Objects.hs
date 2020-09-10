@@ -9,6 +9,7 @@ import OpalFalcon.Scene.Objects.Plane as P
 import OpalFalcon.Scene.Objects.PointLight as PL
 import OpalFalcon.Scene.Objects.Sphere as S
 import OpalFalcon.Scene.Objects.Triangle as T
+import OpalFalcon.Scene.Objects.TriLight as TL
 
 -- TODO: this is not straightforward.  Make constructors from objects and their materials.  The separation is so we can have the same objects rendered with different materials so real-time interface can use simple materials?  Or maybe we can just use the 'diffuse' component of the material?
 
@@ -48,3 +49,7 @@ mkDiscLight d c p =
 mkPointLight :: Vec3d -> ColorRGBf -> Float -> LightSource
 mkPointLight p c d =
   MkLight {lightSample = PL.samplePointLight (PL.MkPL p c d)}
+
+mkTriangleLight :: Triangle -> ColorRGBf -> Float -> LightSource
+mkTriangleLight t c p =
+  MkLight {lightSample = TL.sampleTriLight 20 (TL.MkTL t c p)}

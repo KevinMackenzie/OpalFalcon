@@ -4,6 +4,7 @@
 {-# LANGUAGE BangPatterns #-}
 module OpalFalcon.Photon.Photon where
 
+import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Vector
 import OpalFalcon.Photon.STHeap
 
@@ -23,6 +24,21 @@ import GHC.ST (ST(..), runST)
 
 type PhotonMap = KdTree UArray Int Photon
 
+-- no-op
+cullSphere _ _ _ _ _ = False
+
+-- 'rPos' is the position in space; 'rSrcDir' is the direction the ray came from (flipped)
+estimateVolumeRadiance :: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> PhaseFunc -> ColorRGBf
+estimateVolumeRadiance pmap pCount rPos rSrcDir maxDist (PhaseFunc phase) = 
+    let (photons, _) = collectPhotons pmap pCount (\_ -> False) rPos maxDist
+        pts = map (\(Photon pos _ _ _) -> pos) photons
+        r = double2Float $ sqrt $ foldl max 0 $ map (distance2 rPos) pts
+        volume = if r == 0 then Nothing else Just $ (4/3)*pi*r*r*r
+        col = case volume of
+            Nothing -> black
+            Just v -> (1/v) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (phase inc rSrcDir)) |+| c) black photons)
+     in col
+
 cullCylinder:: Vec3d -> Double -> Double -> Vec3d -> Vec3d -> Bool
 -- cullCylinder _ _ _ _ _ = False
 cullCylinder dir r h pos x 
@@ -32,9 +48,9 @@ cullCylinder dir r h pos x
 
 -- Gets the estimated radiance at a certain point in the photon map with a
 --  known surface normal, using a certain number of photons and only searching
---  up to a maximum distance before giving up.
-estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> (Vec3d -> Vec3d -> ColorRGBf) -> Vec3d -> ColorRGBf
-estimateRadiance pmap pCount hpos incDir maxDist brdf norm = 
+--  up to a maximum distance before giving up. 'incdir' is flipped
+estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> Brdf -> Vec3d -> ColorRGBf
+estimateRadiance pmap pCount hpos incDir maxDist (Brdf brdf) norm = 
     let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.001*maxDist) hpos) hpos maxDist
         pts = map (\(Photon pos _ _ _) -> pos) photons
         -- r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
@@ -43,7 +59,8 @@ estimateRadiance pmap pCount hpos incDir maxDist brdf norm =
         r = case area of
             Nothing -> black -- No area means no photons or not enough
             Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (brdf inc incDir)) |+| c) black photons)
-      in r
+            -- If there are fewer than a certain percent of photons, try to avoid artifacts (questionable)
+      in {-if ((fromIntegral (length pts)) < 0.05*(fromIntegral pCount)) then black else-} r
 
 
 -- TODO: Theres an error in the convex hull code...
@@ -102,6 +119,7 @@ mkPhotonMap = mkKdTree
 
 -- A photon that will evaluate its incoming direction strictly
 -- #TODO: this will always be used in haskell code
+--                    pos   col       inc  flags
 data Photon = Photon Vec3d ColorRGBf Vec3d KdAxis deriving Show
 
 mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
