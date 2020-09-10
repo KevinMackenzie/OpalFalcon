@@ -2,12 +2,14 @@ module OpalFalcon.XTracing.RayTraceUtils where
 
 import Data.Bits
 
+import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Ray
 import OpalFalcon.Scene.Camera
 
-type GlobalIllum = Vec3d -> Vec3d -> Vec3d -> (Vec3d -> Vec3d -> ColorRGBf) -> ColorRGBf
+--                  pos      inc      norm     BSSRDF
+type GlobalIllum = Vec3d -> Vec3d -> Vec3d -> Bssrdf -> ColorRGBf
 --                w    h
 type ImageSize = (Int, Int)
 

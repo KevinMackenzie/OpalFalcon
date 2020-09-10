@@ -27,7 +27,7 @@ mkDiffuseMat refl norm =
    in AppliedMaterial
         { transmitRay = xmitRay,
           transmitPhoton = xmitPhoton,
-          photonBrdf = Brdf brdf
+          photonBssrdf = mkBssrdf $ Brdf brdf
         }
 
 mkDiffuseMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
@@ -43,12 +43,12 @@ mkDiffuseMatSchlick refl norm =
 
 mkSpecularMat :: ColorRGBf -> Vec3d -> AppliedMaterial
 mkSpecularMat refl norm =
-  let xmitRay iDir _ = return $ RayPass (reflect iDir norm) refl
+  let xmitRay iDir _ = return $ RayReflect (reflect iDir norm) refl
       xmitPhoton iDir = return $ PhotonPass (reflect iDir norm) refl
    in AppliedMaterial
         { transmitRay = xmitRay,
           transmitPhoton = xmitPhoton,
-          photonBrdf = Brdf (\_ _ -> black)
+          photonBssrdf = mkBssrdf $ Brdf (\_ _ -> black)
         }
 
 -- Material with purely specular reflectivity
@@ -152,13 +152,13 @@ mkSchlickMat
               -- Glossy
               hVec <- schlickRandomGlossyHalfVec mat norm grainDir
               let oDir = reflect iDir hVec
-               in return $ RayPass oDir $ brdf False iDir oDir
+               in return $ RayReflect oDir $ brdf False iDir oDir
             else
               if randVal < reflGlossy + reflDiffuse
                 then return $ RayTerm -- Diffuse
                 else
                   let oDir = reflect iDir norm
-                   in return $ RayPass oDir $ brdf True iDir oDir
+                   in return $ RayReflect oDir $ brdf True iDir oDir
         -- Since all reflections are specular, the "reflectance" we return back is just the specular reflectance
         -- TODO: We may have to compensate for the geometry term for glossy reflections
         xmitPhoton iDir = do
@@ -185,5 +185,5 @@ mkSchlickMat
      in AppliedMaterial
           { transmitRay = xmitRay,
             transmitPhoton = xmitPhoton,
-            photonBrdf = Brdf $ brdf False -- \i o -> let c = brdf False i o in trace ((show i) ++ "'-,-'" ++ (show o) ++ "==>" ++ (show c)) c
+            photonBssrdf = mkBssrdf $ Brdf $ brdf False -- \i o -> let c = brdf False i o in trace ((show i) ++ "'-,-'" ++ (show o) ++ "==>" ++ (show c)) c
           }

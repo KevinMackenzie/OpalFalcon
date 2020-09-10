@@ -7,3 +7,15 @@
 *.ppm
 *.png
 *.jpg
+
+# Profiling / output files
+*.prof
+*.hp
+*.ps
+*.lock
+*.aux
+*.old
+peda-*
+
+# Temp file
+temp/

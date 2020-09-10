@@ -32,7 +32,7 @@ data RayTracer = RayTracer {globalIllum :: GlobalIllum}
 
 ptEpsilon = 0.00001
 
-directIllum scene pos idir norm brdf = sampleLights scene (mkRayBrdf brdf idir) pos
+directIllum scene pos idir norm bssrdf = sampleLights scene (mkRayBrdf (mkBrdf bssrdf pos) idir) pos
 
 traceRays :: (Monad m, RandomGen g, ObjectCollection o) => RayTracer -> Scene o -> [Ray] -> RandT g m [ColorRGBf]
 traceRays pt sc rays =
@@ -45,16 +45,18 @@ traceRays pt sc rays =
           Nothing -> return $ V3 0 1 0 -- Background color
           Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
             let iDir = negateVec $ normalize hDir
+                pass oPos oDir refl = (refl |*|) <$> (shootRay (Ray (oPos |+| (ptEpsilon *| oDir)) oDir) (HSpec : path))
              in do
                   rayResult <- transmitRay m iDir black
                   case rayResult of
                     RayTerm ->
                       liftM2
                         (|+|)
-                        (return $ glob pos iDir norm (photonBrdf m)) -- Indirect
-                        (directIllum sc pos iDir norm (photonBrdf m)) -- Direct
-                    RayPass oDir refl -> (refl |*|) <$> (shootRay (Ray (pos |+| (ptEpsilon *| oDir)) oDir) (HSpec : path))
-      mf (n,x) = shootRay x []
+                        (return $ glob pos iDir norm (photonBssrdf m)) -- Indirect
+                        (directIllum sc pos iDir norm (photonBssrdf m)) -- Direct
+                    RayReflect oDir refl -> pass pos oDir refl
+                    RayScatter oPos oDir refl -> pass oPos oDir refl
+      mf (n, x) = shootRay x []
    in mapM mf $ zip [1 ..] rays
 
 -- TODO: This _is_ parallel, but for some reason its not any faster

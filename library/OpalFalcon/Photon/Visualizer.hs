@@ -81,5 +81,5 @@ renderIlluminance glob scene cam height =
           Nothing -> black
           Just h -> {-trace (show c)-} c
             where
-              c = glob (hitPos h) (negateVec $ dir $ hitInc h) (hitNorm h) (photonBrdf $ hitMat h)
+              c = glob (hitPos h) (negateVec $ dir $ hitInc h) (hitNorm h) (photonBssrdf $ hitMat h)
    in map shoot $ genRays cam height

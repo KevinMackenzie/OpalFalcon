@@ -188,7 +188,7 @@ main =
   let w = 200
       h = 200
       -- pixs = pathTraceScene (globIllum pmap 200 1.0) (mkStdGen 0x1337beef) cornellBox cam h
-      gil pmap pcount maxDist pos inc norm brdf = estimateRadiance pmap pcount pos inc maxDist brdf norm
+      gil pmap pcount maxDist pos inc norm bssrdf = estimateRadiance pmap pcount pos inc maxDist bssrdf norm
       yesglil p = gil p 500 0.5
       noglil p _ _ _ _ = black
       -- ptrcr = PathTracer {globalIllum = gil pmap 200 1.0}

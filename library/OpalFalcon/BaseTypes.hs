@@ -7,16 +7,26 @@ import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
 
 -- These use the current position as the origin of the two vectors (so incoming vectors are "flipped")
---           lInDir   lOutDir  3-band distribution
+--                        lInPos lInDir    lOutPos lOutDir    3 band color distrib
+newtype Bssrdf = Bssrdf ((Vec3d, Vec3d) -> (Vec3d, Vec3d) -> ColorRGBf)
+
+-- A BRDF with the "lOutDir" and Pos alrady applied
+newtype RayBssrdf = RayBssrdf ((Vec3d, Vec3d) -> ColorRGBf)
+
+--                lInDir   lOutDir  3-band distribution
+newtype PhaseFunc = PhaseFunc (Vec3d -> Vec3d -> ColorRGBf)
+
 newtype Brdf = Brdf (Vec3d -> Vec3d -> ColorRGBf)
 
 -- A BRDF with the "lOutDir" alrady applied
 newtype RayBrdf = RayBrdf (Vec3d -> ColorRGBf)
 
---                lInDir   lOutDir  3-band distribution
-newtype PhaseFunc = PhaseFunc (Vec3d -> Vec3d -> ColorRGBf)
-
 mkRayBrdf (Brdf brdf) rayIncDir = RayBrdf $ flip brdf rayIncDir
+
+mkBssrdf (Brdf brdf) = Bssrdf (\(_, iDir) (_, oDir) -> brdf iDir oDir)
+mkBrdf (Bssrdf bssrdf) pos = Brdf $ (\i o -> bssrdf (pos, i) (pos, o))
+
+mkRayBssrdf (Bssrdf bssrdf) rayInc = RayBssrdf $ flip bssrdf rayInc
 
 data Hit
   = MkHit
@@ -44,9 +54,11 @@ data HitType = HDiff | HSpec | HLight
 type Path = [HitType]
 
 data RayTransmitResult
-  = RayPass Vec3d ColorRGBf
+  = RayReflect Vec3d ColorRGBf
+  | RayScatter Vec3d Vec3d ColorRGBf
   | RayTerm
 
+-- TODO: Scattering
 data PhotonTransmitResult
   = PhotonPass Vec3d ColorRGBf
   | PhotonStore Vec3d ColorRGBf
@@ -63,12 +75,12 @@ data AppliedMaterial
         transmitRay :: (forall g m. (Monad m, RandomGen g) => Vec3d -> ColorRGBf -> RandT g m RayTransmitResult),
         -- Reflects a photon from a provided incoming direction.  Used in a russian-roulette method
         transmitPhoton :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m PhotonTransmitResult),
-        -- The BRDF used when estimating irradiance from photon map
-        photonBrdf :: Brdf
+        -- The BSSRDF used when estimating irradiance from photon map
+        photonBssrdf :: Bssrdf
       }
 
 -- Provides function to sample light source from a point in the scene
---   This is only good for lambertian surfaces
+--   This is only good for lambertian surfaces, so only BRDF's are supported
 data LightSource
   = MkLight
       { lightSample ::

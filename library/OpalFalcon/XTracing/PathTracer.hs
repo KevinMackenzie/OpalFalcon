@@ -36,9 +36,11 @@ pathTraceScene pt sc height cam =
           Nothing -> return $ V3 0 1 0 -- Background color
           Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
             let iDir = negateVec $ normalize hDir
+                pass oPos oDir refl = (refl |*|) <$> (shootRay (Ray (oPos |+| (ptEpsilon *| oDir)) oDir) (HSpec : path))
              in do
                   rayResult <- transmitRay m iDir black
                   case rayResult of
-                    RayTerm -> return $ glob pos iDir norm (photonBrdf m)
-                    RayPass oDir refl -> (refl |*|) <$> (shootRay (Ray (pos |+| (ptEpsilon *| oDir)) oDir) (HSpec : path))
+                    RayTerm -> return $ glob pos iDir norm (photonBssrdf m)
+                    RayReflect oDir refl -> pass pos oDir refl
+                    RayScatter oPos oDir refl -> pass oPos oDir refl
    in mapM (\(n, x) -> shootRay x []) $ zip [1 ..] $ genRays cam height

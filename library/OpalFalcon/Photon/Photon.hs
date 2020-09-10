@@ -49,8 +49,8 @@ cullCylinder dir r h pos x
 -- Gets the estimated radiance at a certain point in the photon map with a
 --  known surface normal, using a certain number of photons and only searching
 --  up to a maximum distance before giving up. 'incdir' is flipped
-estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> Brdf -> Vec3d -> ColorRGBf
-estimateRadiance pmap pCount hpos incDir maxDist (Brdf brdf) norm = 
+estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> Bssrdf -> Vec3d -> ColorRGBf
+estimateRadiance pmap pCount hpos incDir maxDist (Bssrdf bssrdf) norm = 
     let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.001*maxDist) hpos) hpos maxDist
         pts = map (\(Photon pos _ _ _) -> pos) photons
         -- r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
@@ -58,7 +58,7 @@ estimateRadiance pmap pCount hpos incDir maxDist (Brdf brdf) norm =
         area = ((\x -> if x == 0 then trace ("Hit at (" ++ (show hpos) ++ ") wiht norm (" ++ (show norm) ++ ") and " ++ (show $ length pts) ++ " photons") x else x) . double2Float) <$> convexHullArea pts norm
         r = case area of
             Nothing -> black -- No area means no photons or not enough
-            Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (brdf inc incDir)) |+| c) black photons)
+            Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (bssrdf (pos, inc) (hpos, incDir))) |+| c) black photons)
             -- If there are fewer than a certain percent of photons, try to avoid artifacts (questionable)
       in {-if ((fromIntegral (length pts)) < 0.05*(fromIntegral pCount)) then black else-} r
 
