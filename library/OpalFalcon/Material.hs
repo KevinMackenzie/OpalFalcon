@@ -44,7 +44,7 @@ mkDiffuseMatSchlick refl norm =
 mkSpecularMat :: ColorRGBf -> Vec3d -> AppliedMaterial
 mkSpecularMat refl norm =
   let xmitRay iDir _ = return $ RayReflect (reflect iDir norm) refl
-      xmitPhoton iDir = return $ PhotonPass (reflect iDir norm) refl
+      xmitPhoton iDir = return $ PhotonReflect (reflect iDir norm) refl
    in AppliedMaterial
         { transmitRay = xmitRay,
           transmitPhoton = xmitPhoton,
@@ -172,7 +172,7 @@ mkSchlickMat
                   -- Glossy
                   hVec <- schlickRandomGlossyHalfVec mat norm grainDir
                   let oDir = reflect iDir hVec
-                   in return $ PhotonPass oDir f0
+                   in return $ PhotonReflect oDir f0
                 else
                   if randVal < reflGlossy + reflDiffuse
                     then do
@@ -181,7 +181,7 @@ mkSchlickMat
                       return $ PhotonStore oDir f0
                     else
                       let oDir = reflect iDir norm -- Specular
-                       in return $ PhotonPass oDir f0
+                       in return $ PhotonReflect oDir f0
      in AppliedMaterial
           { transmitRay = xmitRay,
             transmitPhoton = xmitPhoton,

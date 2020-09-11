@@ -21,12 +21,12 @@ newtype Brdf = Brdf (Vec3d -> Vec3d -> ColorRGBf)
 -- A BRDF with the "lOutDir" alrady applied
 newtype RayBrdf = RayBrdf (Vec3d -> ColorRGBf)
 
+
+mkRayBssrdf (Bssrdf bssrdf) rayInc = RayBssrdf $ flip bssrdf rayInc
 mkRayBrdf (Brdf brdf) rayIncDir = RayBrdf $ flip brdf rayIncDir
 
 mkBssrdf (Brdf brdf) = Bssrdf (\(_, iDir) (_, oDir) -> brdf iDir oDir)
 mkBrdf (Bssrdf bssrdf) pos = Brdf $ (\i o -> bssrdf (pos, i) (pos, o))
-
-mkRayBssrdf (Bssrdf bssrdf) rayInc = RayBssrdf $ flip bssrdf rayInc
 
 data Hit
   = MkHit
@@ -58,9 +58,13 @@ data RayTransmitResult
   | RayScatter Vec3d Vec3d ColorRGBf
   | RayTerm
 
--- TODO: Scattering
+-- Photon shot from a light source
+data EmissivePhoton = EPhoton !Ray !ColorRGBf
+
+-- TODO: Is refraction a special case?
 data PhotonTransmitResult
-  = PhotonPass Vec3d ColorRGBf
+  = PhotonReflect Vec3d ColorRGBf
+  | PhotonScatter [EmissivePhoton] (Maybe EmissivePhoton) -- Scattering case returns photons to add to volume photon map, with output photon if not absorbed
   | PhotonStore Vec3d ColorRGBf
   | PhotonAbsorb
 
@@ -71,9 +75,9 @@ data PhotonTransmitResult
 -- TODO: investigate if it is possible to merge stochastic transmission functions
 data AppliedMaterial
   = AppliedMaterial
-      { -- Reflects a ray from a provided incoming direction.  Used in a path-tracing method
+      { -- transmit a ray from a provided incoming direction.  Used in a path-tracing method
         transmitRay :: (forall g m. (Monad m, RandomGen g) => Vec3d -> ColorRGBf -> RandT g m RayTransmitResult),
-        -- Reflects a photon from a provided incoming direction.  Used in a russian-roulette method
+        -- Transmit a photon from a provided incoming direction.  Used in a russian-roulette method
         transmitPhoton :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m PhotonTransmitResult),
         -- The BSSRDF used when estimating irradiance from photon map
         photonBssrdf :: Bssrdf

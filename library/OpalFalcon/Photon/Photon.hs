@@ -117,8 +117,7 @@ convexHull (p0:(p1:(p2:t))) norm =
 mkPhotonMap :: [Photon] -> PhotonMap
 mkPhotonMap = mkKdTree
 
--- A photon that will evaluate its incoming direction strictly
--- #TODO: this will always be used in haskell code
+-- A photon inside of the photon acceleration structure
 --                    pos   col       inc  flags
 data Photon = Photon Vec3d ColorRGBf Vec3d KdAxis deriving Show
 

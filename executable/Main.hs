@@ -163,10 +163,10 @@ filterJust [] = []
 filterJust ((Nothing) : xs) = filterJust xs
 filterJust ((Just x) : xs) = x : (filterJust xs)
 
-spherePhotonShoot sc pow cnt pos =
-  do
-    rnd <- getRandoms
-    concat <$> (mapM (\d -> shootPhoton 0 sc (EPhoton (Ray pos d) (pow |/ (fromIntegral cnt)))) $ take cnt rnd)
+-- spherePhotonShoot sc pow cnt pos =
+--   do
+--     rnd <- getRandoms
+--     concat <$> (mapM (\d -> shootPhoton 0 sc (EPhoton (Ray pos d) (pow |/ (fromIntegral cnt)))) $ take cnt rnd)
 
 repeatMF :: (Monad m) => Integer -> m a -> m [a]
 repeatMF 0 f = return []
@@ -174,14 +174,14 @@ repeatMF c f = do
   v <- f
   (v :) <$> (repeatMF (c -1) f)
 
-areaPhotonShoot :: (Monad m, RandomGen g, ObjectCollection o) => Scene o -> ColorRGBf -> Int -> Vec3d -> Vec3d -> Vec3d -> Int -> RandT g m [Photon]
+areaPhotonShoot :: (Monad m, RandomGen g, ObjectCollection o) => Scene o -> ColorRGBf -> Int -> Vec3d -> Vec3d -> Vec3d -> Int -> RandT g m ([Photon],[Photon])
 areaPhotonShoot sc pow cnt pos x2 y2 minBounce =
   let norm = normalize $ x2 |><| y2
    in do
         dirs <- repeatMF (toInteger cnt) $ cosWeightedDir norm
         xs <- (fmap (\a -> (2 * a -1) *| x2)) <$> getRandoms
         ys <- (fmap (\a -> (2 * a -1) *| y2)) <$> getRandoms
-        concat <$> (mapM (\((d, x, y) :: (Vec3d, Vec3d, Vec3d)) -> shootPhoton minBounce sc (EPhoton (Ray (pos |+| x |+| y) d) (pow |/ (fromIntegral cnt)))) $ take cnt $ zip3 dirs xs ys)
+        (\(a,b) -> (concat a, concat b)) <$> unzip <$> (mapM (\((d, x, y) :: (Vec3d, Vec3d, Vec3d)) -> shootPhoton minBounce sc (EPhoton (Ray (pos |+| x |+| y) d) (pow |/ (fromIntegral cnt)))) $ take cnt $ zip3 dirs xs ys)
 
 main :: IO ()
 main =
@@ -204,8 +204,9 @@ main =
       -- fb = renderPhotons cornellBox cam h $ phs' ++ phs1 ++ phs2
       do
         args <- getArgs
-        phs <- evalRandIO $ areaPhotonShoot cornellBox lightPow 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5) 1 -- only indirect lighting
-        pmap <- return $ ((mkKdTree phs) :: PhotonMap)
+        (sPhs, vPhs) <- evalRandIO $ areaPhotonShoot cornellBox lightPow 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5) 1 -- only indirect lighting
+        sPmap <- return $ ((mkKdTree sPhs) :: PhotonMap)
+        vPmap <- return $ ((mkKdTree vPhs) :: PhotonMap)
         -- fb <- return $ renderPhotons cornellBox cam h phs
         -- pixs <- return $ renderIlluminance (gil pmap 100 0.5) cornellBox cam h
         -- print $ take 30 $ map (\(Photon pos col dir _) -> 100*|col) phs
@@ -213,7 +214,7 @@ main =
         -- print $ length $ filter (\c -> (mag c) > 0) $ fbPixelList fb
         -- saveToPngPmap "pmap.png" ((100 *|) <$> (fbPixelList fb)) (fbWidth fb) (fbHeight fb)
         -- print $ splitList 10 [1..100]
-        pixs <- rayTraceScene (read $ args !! 0) (RayTracer {globalIllum = yesglil pmap}) cornellBox h cam
+        pixs <- rayTraceScene (read $ args !! 0) (RayTracer {globalIllum = yesglil sPmap}) cornellBox h cam
         -- print $ length pixs
         saveToPngRtr "pngfile.png" pixs w h
 

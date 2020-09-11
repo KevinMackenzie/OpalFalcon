@@ -21,10 +21,12 @@ vecZip f !v0 !v1 = liftA2 f v0 v1
 (|+|) :: (Vector a, Num b) => a b -> a b -> a b
 (|-|) :: (Vector a, Num b) => a b -> a b -> a b
 (|*|) :: (Vector a, Num b) => a b -> a b -> a b
+(|/|) :: (Vector a, Fractional b) => a b -> a b -> a b
 
 (|+|) = vecZip (+)
 (|-|) = vecZip (-)
 (|*|) = vecZip (*)
+(|/|) = vecZip (/)
 
 -- Approximately equal to with default epsilon
 (~=) :: (Vector a, Ord b, Fractional b) => a b -> a b -> Bool
