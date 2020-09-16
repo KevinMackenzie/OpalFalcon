@@ -8,8 +8,10 @@ import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Ray
 import OpalFalcon.Scene.Camera
 
---                  pos      inc      norm     BSSRDF
-type GlobalIllum = Vec3d -> Vec3d -> Vec3d -> Bssrdf -> ColorRGBf
+--                     pos   lightOutDir norm     BSSRDF
+type SurfaceRadiance = Vec3d -> Vec3d -> Vec3d -> Bssrdf -> ColorRGBf
+--                     pos   lightOutDir phase
+type VolumeRadiance = Vec3d -> Vec3d -> PhaseFunc -> ColorRGBf
 --                w    h
 type ImageSize = (Int, Int)
 

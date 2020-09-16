@@ -9,5 +9,5 @@ import OpalFalcon.Scene
 data ObjectList = MkObjList { objList :: [Object] }
 
 instance ObjectCollection ObjectList where
-    probeCollection ol r = foldr (closerHit $ pos r) Nothing $ map (\x -> objIntersectRay x r) $ objList ol
+    probeCollection ol r@(Ray pos _) = foldr (closerHit pos) Nothing $ map (\x -> objIntersectRay x r) $ objList ol
 

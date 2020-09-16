@@ -5,21 +5,17 @@ module OpalFalcon.Scene.Objects.TriLight
 where
 
 import Control.Monad.Random
-import Data.Bits
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Lighting
-import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
 import OpalFalcon.Scene.Objects.PointLight
 import OpalFalcon.Scene.Objects.Triangle
-import System.Random
 
 data TriLight = MkTL Triangle ColorRGBf Float
 
-sampleTriLight :: (Monad m, RandomGen g) => Integer -> TriLight -> (Ray -> Maybe Hit) -> RayBrdf -> Vec3d -> RandT g m ColorRGBf
-sampleTriLight c (MkTL lTri lCol lPow) probe brdf oPos =
-  vecSum
-    <$> ( replicateM (fromInteger c) $
-            uniformTri lTri
-              >>= (\x -> samplePointLight (MkPL x lCol (lPow / (fromInteger c))) probe brdf oPos)
-        )
+-- TODO: This uses the point-light estimate, but a hemisphereical light aligns better with how the photons are shot from the surface
+sampleTriLight :: (Monad m, RandomGen g) => Integer -> TriLight -> RandT g m [LightSample]
+sampleTriLight c (MkTL lTri lCol lPow) =
+  concat <$> (replicateM (fromInteger c) $
+    uniformTri lTri
+      >>= (\x -> samplePointLight $ MkPL x lCol (lPow / (fromInteger c))))

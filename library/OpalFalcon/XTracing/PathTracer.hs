@@ -16,7 +16,7 @@ numBounces = length
 
 -- Maybe we can accumulate the BRDF weight as well, so our termination case is based on how much the next calculation would contribute to the sample.  This way we don't have to make concrete decisions based on limited path knowledge alone
 
-data PathTracer = PathTracer {globalIllum :: GlobalIllum}
+data PathTracer = PathTracer {globalIllum :: SurfaceRadiance}
 
 -- instance XTracer PathTracer where
 --   renderScene = pathTraceScene
@@ -38,9 +38,9 @@ pathTraceScene pt sc height cam =
             let iDir = negateVec $ normalize hDir
                 pass oPos oDir refl = (refl |*|) <$> (shootRay (Ray (oPos |+| (ptEpsilon *| oDir)) oDir) (HSpec : path))
              in do
-                  rayResult <- transmitRay m iDir black
+                  rayResult <- transmitRay m iDir
                   case rayResult of
-                    RayTerm -> return $ glob pos iDir norm (photonBssrdf m)
+                    RayTerm -> return $ glob pos iDir norm (surfaceBssrdf m)
                     RayReflect oDir refl -> pass pos oDir refl
-                    RayScatter oPos oDir refl -> pass oPos oDir refl
+                    RayParticipate _ -> return $ glob pos iDir norm (surfaceBssrdf m)
    in mapM (\(n, x) -> shootRay x []) $ zip [1 ..] $ genRays cam height

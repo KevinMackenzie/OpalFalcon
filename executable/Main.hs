@@ -214,7 +214,7 @@ main =
         -- print $ length $ filter (\c -> (mag c) > 0) $ fbPixelList fb
         -- saveToPngPmap "pmap.png" ((100 *|) <$> (fbPixelList fb)) (fbWidth fb) (fbHeight fb)
         -- print $ splitList 10 [1..100]
-        pixs <- rayTraceScene (read $ args !! 0) (RayTracer {globalIllum = yesglil sPmap}) cornellBox h cam
+        pixs <- rayTraceScene (read $ args !! 0) (RayTracer {surfaceRadiance = yesglil sPmap, volumeRadiance = undefined}) cornellBox h cam
         -- print $ length pixs
         saveToPngRtr "pngfile.png" pixs w h
 

@@ -254,3 +254,7 @@ fromSphere (V3 r theta psi) = (V3 x y z)
 -- Gets a vector orthagonal to the provided vector
 getOrthoVec :: (Ord b, Floating b) => Vec3 b -> Vec3 b
 getOrthoVec v = normalize $ v |><| (if (mag (v |><| xAxis)) < 0.001 then yAxis else xAxis)
+
+-- Returns true if 'x' is inside the slice of space at pos 'beg' with the vector 'end-beg'
+isBetween :: Vec3d -> Vec3d -> Vec3d -> Bool
+isBetween beg end x = (end |-| x) |.| (end |-| beg) < 0

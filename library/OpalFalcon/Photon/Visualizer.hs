@@ -74,12 +74,13 @@ rasterPhotons frame phs =
       fbData = runSTArray $ rasterPhotons' (fbWidth frame) (fbData frame) phs
     }
 
-renderIlluminance :: (ObjectCollection o) => GlobalIllum -> Scene o -> Camera -> Int -> [ColorRGBf]
+renderIlluminance :: (ObjectCollection o) => SurfaceRadiance -> Scene o -> Camera -> Int -> [ColorRGBf]
 renderIlluminance glob scene cam height =
   let shoot r =
         case probeCollection (objects scene) r of
           Nothing -> black
           Just h -> {-trace (show c)-} c
             where
-              c = glob (hitPos h) (negateVec $ dir $ hitInc h) (hitNorm h) (photonBssrdf $ hitMat h)
+              c = glob (hitPos h) (negateVec incDir) (hitNorm h) (surfaceBssrdf $ hitMat h)
+              (Ray _ incDir) = hitInc h
    in map shoot $ genRays cam height

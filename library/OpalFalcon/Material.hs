@@ -16,7 +16,7 @@ import OpalFalcon.Math.Vector
 mkDiffuseMat :: ColorRGBf -> Vec3d -> AppliedMaterial
 mkDiffuseMat refl norm =
   let brdf _ _ = refl |/ pi
-      xmitRay _ _ = return RayTerm
+      xmitRay _ = return RayTerm
       xmitPhoton iDir = do
         rrRand <- getRandom -- Russian-Roulette the surface reflectance
         if rrRand >= (vecAvgComp refl)
@@ -27,7 +27,7 @@ mkDiffuseMat refl norm =
    in AppliedMaterial
         { transmitRay = xmitRay,
           transmitPhoton = xmitPhoton,
-          photonBssrdf = mkBssrdf $ Brdf brdf
+          surfaceBssrdf = mkBssrdf $ Brdf brdf
         }
 
 mkDiffuseMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
@@ -43,12 +43,12 @@ mkDiffuseMatSchlick refl norm =
 
 mkSpecularMat :: ColorRGBf -> Vec3d -> AppliedMaterial
 mkSpecularMat refl norm =
-  let xmitRay iDir _ = return $ RayReflect (reflect iDir norm) refl
+  let xmitRay iDir = return $ RayReflect (reflect iDir norm) refl
       xmitPhoton iDir = return $ PhotonReflect (reflect iDir norm) refl
    in AppliedMaterial
         { transmitRay = xmitRay,
           transmitPhoton = xmitPhoton,
-          photonBssrdf = mkBssrdf $ Brdf (\_ _ -> black)
+          surfaceBssrdf = mkBssrdf $ Brdf (\_ _ -> black)
         }
 
 -- Material with purely specular reflectivity
@@ -144,8 +144,8 @@ mkSchlickMat
   norm
   grainDir =
     let brdf = schlickBRDF mat norm grainDir
-        (reflDiffuse, reflGlossy, reflSpecular) = schlickDeriveParameters sigma
-        xmitRay iDir _ = do
+        (reflDiffuse, reflGlossy, _) = schlickDeriveParameters sigma
+        xmitRay iDir = do
           randVal <- getRandom -- Imporance sample the 3 brdf lobes
           if randVal < reflGlossy
             then do
@@ -185,5 +185,5 @@ mkSchlickMat
      in AppliedMaterial
           { transmitRay = xmitRay,
             transmitPhoton = xmitPhoton,
-            photonBssrdf = mkBssrdf $ Brdf $ brdf False -- \i o -> let c = brdf False i o in trace ((show i) ++ "'-,-'" ++ (show o) ++ "==>" ++ (show c)) c
+            surfaceBssrdf = mkBssrdf $ Brdf $ brdf False -- \i o -> let c = brdf False i o in trace ((show i) ++ "'-,-'" ++ (show o) ++ "==>" ++ (show c)) c
           }

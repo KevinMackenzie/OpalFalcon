@@ -5,12 +5,9 @@ module OpalFalcon.Scene
   )
 where
 
-import Control.Monad (foldM)
 import Control.Monad.Random
 import qualified OpalFalcon.BaseTypes as Bt
 import qualified OpalFalcon.Math.Ray as R
-import OpalFalcon.Math.Vector
-import System.Random
 
 class ObjectCollection c where
   probeCollection :: c -> R.Ray -> Maybe Bt.Hit
@@ -21,16 +18,14 @@ data Scene o
         lightSources :: [Bt.LightSource]
       }
 
+-- Samples all lights in the scene and returns a list of all samples that
+--  are not occluded by other objects in the scene
 sampleLights ::
   (Monad m, RandomGen g, ObjectCollection c) =>
   Scene c ->
-  Bt.RayBrdf ->
-  Vec3d -> -- position of sample
-  RandT g m ColorRGBf -- Total outgoing radiance contribution from direct illumination
-sampleLights scene brdf pos =
-  do
-    contribs <- mapM (\l -> (Bt.lightSample l) (probeCollection $ objects scene) brdf pos) $ lightSources scene
-    foldM (\x y -> return $ x |+| y) black contribs
+  RandT g m [Bt.LightSample] -- List of point lights representing direct illumination
+sampleLights scene =
+  concat <$> (mapM Bt.lightSample $ lightSources scene)
 -- sampleLights :: (ObjectCollection c) => ColorRGBf -> Scene c -> Vec3d -> ColorRGBf
 -- sampleLights ambient scene pos =
 --   foldr (|+|) ambient
