@@ -5,12 +5,15 @@ import OpalFalcon.Math.Vector
 data Ray = Ray Vec3d Vec3d
     deriving (Eq, Show)
 
+{-# INLINE pointAtParameter #-}
 pointAtParameter :: Ray -> Double -> Vec3d
 pointAtParameter (Ray rPos rDir) p = rPos |+| (p *| rDir)
 
+{-# INLINE advanceRay #-}
 advanceRay :: Ray -> Double -> Ray
 advanceRay r@(Ray _ d) p = Ray (pointAtParameter r p) d
 
+{-# INLINE reflectRay #-}
 reflectRay :: Ray -> Vec3d -> Vec3d
 reflectRay (Ray _ d) norm = reflect (negateVec d) norm
 

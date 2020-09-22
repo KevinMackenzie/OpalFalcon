@@ -1,9 +1,13 @@
 {-# LANGUAGE RankNTypes #-}
 
+{-# LANGAUGE ScopedTypeVariables #-}
+
 module OpalFalcon.XTracing.RayTracer
   ( RayTracer (..),
     rayTraceScene,
     splitList,
+    testParallel,
+    testParallel2,
   )
 where
 
@@ -25,6 +29,7 @@ import OpalFalcon.Util.Random
 import OpalFalcon.XTracing.RayTraceUtils
 import OpalFalcon.XTracing.XTracer
 import System.Random
+import System.Time.Extra (sleep)
 
 numBounces :: Path -> Int
 numBounces = length
@@ -60,12 +65,13 @@ participateMedia rt sc (ParticipatingMaterial {participateAbsorb = absorb, parti
       -- factors in attenuation through the medium and in-scattering of light
       stepFull eventPos prevPos prevRad =
         let deltaPos = distance eventPos prevPos
+            deltaPosF = double2Float deltaPos
             prevContrib = attenuateMedium eventPos prevRad deltaPos
             multiScattering = volumeRadiance rt eventPos lightDir phase
          in do
               -- Note: To avoid aliasing, jitter the sample location around 'eventPos'
               singleScattering <- directContribution eventPos
-              return $ prevContrib |+| multiScattering |+| singleScattering
+              return $ (singleScattering |* deltaPosF) |+| (multiScattering |* deltaPosF) |+| prevContrib
       -- Only factors in the attenuation through the medium
       stepDirectOnly samplePos prevPos prevRad =
         return $ attenuateMedium samplePos prevRad $ distance samplePos prevPos
@@ -109,8 +115,8 @@ directIllum scene pos rInDir norm (Bssrdf bssrdf) =
               samples
         return $ vecSum contribs
 
-traceRays :: (Monad m, RandomGen g, ObjectCollection o) => RayTracer -> Scene o -> [Ray] -> RandT g m [ColorRGBf]
-traceRays rt sc rays =
+traceRay :: (Monad m, RandomGen g, ObjectCollection o) => RayTracer -> Scene o -> (Integer, Ray) -> RandT g m ColorRGBf
+traceRay rt sc ray =
   let glob = surfaceRadiance rt
       shootRay ray path
         | numBounces path > 5 = return $ V3 1 0 0 -- Too many bounces
@@ -137,16 +143,17 @@ traceRays rt sc rays =
                           (Ray oPos oDir) = advanceRay (Ray lInPos hDir) ptEpsilon
                        in do
                             incomingRad <- pass oPos oDir (surfaceBssrdf m)
-                            participateMedia rt sc pMat lInPos pos incomingRad
-      mf (n, x) = id $! shootRay x []
-   in mapM mf $ zip [1 ..] rays
+                            vecAverage <$> (replicateM 100 $ participateMedia rt sc pMat lInPos pos incomingRad)
+      mf (n, x) = shootRay x []
+   in mf ray
 
--- TODO: This _is_ parallel, but for some reason its not any faster
 startThreads :: (a -> IO b) -> [a] -> IO [(ThreadId, IO (Thread.Result b))]
 startThreads _ [] = return []
 startThreads f (h : t) =
   do
-    res <- Thread.forkIO (f h)
+    res <- Thread.forkOS $ do
+      v <- f h
+      return v
     tail <- startThreads f t
     return $ res : tail
 
@@ -158,29 +165,42 @@ joinThreads ((tid, resHandle) : t) =
     tail <- joinThreads t
     return $ res : tail
 
-rayTraceScene :: (ObjectCollection o) => Int -> RayTracer -> Scene o -> Int -> Camera -> IO [ColorRGBf]
-rayTraceScene n rt sc height cam =
-  let l = genRays cam height
-      n' = ((length l) `div` n) + 1
-      groups = splitList n' l
-   in do
-        threads <- startThreads (\x -> evalRandIO $ traceRays rt sc x) groups
-        fmap concat $ joinThreads threads
-
 splitList :: Int -> [a] -> [[a]]
 splitList n [] = []
 splitList n l = (take n l) : (splitList n $ drop n l)
 
-mapPar f (h : t) = v `par` (vt `pseq` (v : vt))
-  where
-    v = f h
-    vt = mapPar f t
-mapPar _ [] = []
-
-mapMParallel :: RandomGen g => g -> Int -> (a -> RandT g Identity b) -> [a] -> [b]
-mapMParallel gen n f l =
+-- Eval each ray in the IO monad because the ray can't evaluate anything until the RNG is provided.  (This prevents large memory requirements)
+mtMapM :: Int -> (a -> IO b) -> [a] -> IO [b]
+mtMapM n f l =
   let n' = ((length l) `div` n) + 1
       groups = splitList n' l
-      ps = zip groups $ randGens gen
-      res = mapPar (\(x, y) -> evalRand (mapM f x) y) ps
-   in concat res
+   in do
+        threads <-
+          startThreads
+            -- This forces evaluation of the whole list before the thread returns
+            (\x -> (\vals -> (last vals) `seq` vals) <$> (mapM f x))
+            groups
+        concat <$> (joinThreads threads)
+
+-- TODO: I'm not sure why this isn't parallelizing correct.  I suspect it has something to do with memory protection / mutexes since it doesn't happen with the test code at the bottom, but I do not know.
+rayTraceScene :: (ObjectCollection o) => Int -> RayTracer -> Scene o -> Int -> Camera -> IO [ColorRGBf]
+rayTraceScene n rt sc height cam =
+  let l = zip [1 ..] (genRays cam height)
+      f x = evalRandIO $ traceRay rt sc x
+   in mtMapM n f l
+
+testParallel2 n =
+  do
+    _ <- mtMapM n (\x -> (\y -> y * y) <$> (\y -> head $ (randoms y) :: Float) <$> getStdGen) [1 .. 10000000]
+    return ()
+
+testParallel =
+  do
+    (_, wait) <- Thread.forkIO $ do
+      l <- (fmap (\x -> x * x)) <$> (\x -> take 100000000 $ ((randoms x) :: [Float])) <$> getStdGen
+      print $ last l
+      return ()
+    l <- (fmap (\x -> x * x)) <$> (\x -> take 100000000 $ ((randoms x) :: [Float])) <$> getStdGen
+    print $ last l
+    x <- Thread.result =<< wait
+    print $ show x

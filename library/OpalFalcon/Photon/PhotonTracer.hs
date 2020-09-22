@@ -43,5 +43,6 @@ shootPhoton minBounces scene photon =
                   let volPhotons = map (\(EPhoton (Ray p d) pow) -> mkPhoton p (pow |*| pCol) d) vPhotons
                    in case outPhoton of -- If no photon leaves, then only add the volume photons
                         Nothing -> return ([], volPhotons)
-                        Just e -> (\(a, b) -> (a, volPhotons ++ b)) <$> next e
+                        -- Also remember to scale the emitted photon
+                        Just (EPhoton r pow) -> (\(a, b) -> (a, volPhotons ++ b)) <$> next (EPhoton r (pow |*| pCol))
    in shoot 0 photon

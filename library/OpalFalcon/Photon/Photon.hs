@@ -2,7 +2,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE BangPatterns #-}
-module OpalFalcon.Photon.Photon where
+module OpalFalcon.Photon.Photon (Photon(..), estimateRadiance, estimateVolumeRadiance, mkPhoton, mkPhotonMap, PhotonMap(..)) where
 
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Vector
@@ -14,7 +14,7 @@ import Debug.Trace
 import Control.Monad
 import Data.Array.ST
 import Data.STRef
-import OpalFalcon.KdTree
+import qualified OpalFalcon.KdTree as Kd
 import Data.Array.Base
 import Data.Bits
 import GHC.Exts
@@ -22,7 +22,7 @@ import GHC.Float (double2Float)
 import GHC.ST (ST(..), runST)
 -- import OpalFalcon.Math.FastTrig
 
-type PhotonMap = KdTree UArray Int Photon
+type PhotonMap = Kd.KdTree UArray Int Photon
 
 -- no-op
 cullSphere _ _ _ _ _ = False
@@ -36,7 +36,7 @@ estimateVolumeRadiance pmap pCount rPos rSrcDir maxDist (PhaseFunc phase) =
         volume = if r == 0 then Nothing else Just $ (4/3)*pi*r*r*r
         col = case volume of
             Nothing -> black
-            Just v -> (1/v) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (phase inc rSrcDir)) |+| c) black photons)
+            Just v -> (1/v) *| (foldl (\c (Photon _ pow inc _) -> (pow |*| (phase inc rSrcDir)) |+| c) black photons)
      in col
 
 cullCylinder:: Vec3d -> Double -> Double -> Vec3d -> Vec3d -> Bool
@@ -115,27 +115,27 @@ convexHull (p0:(p1:(p2:t))) norm =
      in foldl (\el pt -> insertPoint el pt norm) tr t
 
 mkPhotonMap :: [Photon] -> PhotonMap
-mkPhotonMap = mkKdTree
+mkPhotonMap = Kd.mkKdTree
 
 -- A photon inside of the photon acceleration structure
 --                    pos   col       inc  flags
-data Photon = Photon Vec3d ColorRGBf Vec3d KdAxis deriving Show
+data Photon = Photon Vec3d ColorRGBf Vec3d Kd.KdAxis deriving Show
 
 mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
-mkPhoton h c d = Photon h c d XAxis
+mkPhoton h c d = Photon h c d Kd.XAxis
 
 indexPhotonMap :: PhotonMap -> Int -> Photon
-indexPhotonMap (KdTree pmap) i = pmap ! i
+indexPhotonMap (Kd.KdTree pmap) i = pmap ! i
 
 -- TODO: we will want an option that lets us get a radiance estimate without converting to a list
 collectPhotons :: PhotonMap -> Int -> (Vec3d -> Bool) -> Vec3d -> Double -> ([Photon],Int)
 collectPhotons pmap n cull x maxDist = 
-    let pmapSize = kdTreeSize pmap
+    let pmapSize = Kd.kdTreeSize pmap
         recurse p heap d2 = 
             let ph@(Photon pos _ _ axis) = indexPhotonMap pmap p
                 l = recurse (2*p) heap d2
                 r = recurse (2*p+1) heap d2
-                del = (axisElem axis x) - (axisElem axis pos)
+                del = (Kd.axisElem axis x) - (Kd.axisElem axis pos)
                 del2 = distance2 x pos
             in do
                 when (2*p+1 < pmapSize) $ do
@@ -150,7 +150,7 @@ collectPhotons pmap n cull x maxDist =
                         (Photon rp _ _ _) <- getHeapRoot heap
                         writeSTRef d2 $ distance2 rp x
      in runST $ do
-        heap <- mkSTHeap n (Photon origin origin origin XAxis) (\(Photon x' _ _ _) -> distance2 x x')
+        heap <- mkSTHeap n (Photon origin origin origin Kd.XAxis) (\(Photon x' _ _ _) -> distance2 x x')
         d2 <- newSTRef (maxDist*maxDist)
         recurse 1 heap d2
         getHeapContents heap
@@ -171,7 +171,7 @@ genPhoton =
             pos <- rp;
             inc <- ri;
             col <- rc;
-            return $ Photon pos col inc XAxis
+            return $ Photon pos col inc Kd.XAxis
             }
 
 genRandomPhotons :: Integer -> IO ([Photon])
@@ -183,20 +183,20 @@ genRandomPhotons n = if  n == 0 then return [] else do {
 
 
 blankPhoton :: Photon
-blankPhoton = Photon origin origin origin XAxis
+blankPhoton = Photon origin origin origin Kd.XAxis
 
 {-# INLINE unpackFlags #-}
-unpackFlags :: Word -> KdAxis
-unpackFlags 1 = XAxis
-unpackFlags 2 = YAxis
-unpackFlags 3 = ZAxis
+unpackFlags :: Word -> Kd.KdAxis
+unpackFlags 1 = Kd.XAxis
+unpackFlags 2 = Kd.YAxis
+unpackFlags 3 = Kd.ZAxis
 unpackFlags _ = error "Photon axis value violated"
 
 {-# INLINE packFlags #-}
-packFlags :: KdAxis -> Word
-packFlags XAxis = 1
-packFlags YAxis = 2
-packFlags ZAxis = 3
+packFlags :: Kd.KdAxis -> Word
+packFlags Kd.XAxis = 1
+packFlags Kd.YAxis = 2
+packFlags Kd.ZAxis = 3
 packFlags _ = error "Photon axis value violated"
 
 {-# INLINE packDir #-}
@@ -237,13 +237,13 @@ unpackDir w =
 
 -- Converts between theta,phi direction portion of the 4th 32 bits to a normalized vec3 and converts the flags portion
 {-# INLINE unpackDirFlags #-}
-unpackDirFlags :: Word -> (Vec3d, KdAxis)
+unpackDirFlags :: Word -> (Vec3d, Kd.KdAxis)
 unpackDirFlags w = 
     let dir = w .&. 0xffff
         flags = shiftR (w .&. 0xffff0000) 16
     in  (unpackDir dir, unpackFlags flags)
 {-# INLINE packDirFlags #-}
-packDirFlags :: Vec3d -> KdAxis -> Word
+packDirFlags :: Vec3d -> Kd.KdAxis -> Word
 packDirFlags dir axis = (shiftL (packFlags axis) 16) .|. (packDir dir)
 -- Converts between shared exponent color and separate exponent color
 -- (see https://www.khronos.org/registry/OpenGL/extensions/EXT/EXT_texture_shared_exponent.txt)
@@ -271,7 +271,7 @@ packColor col =
     in  fromIntegral $ bs .|. (shiftL gs 9) .|. (shiftL rs 18) .|. (shiftL exp_shared 27)
 
 
-instance KdTreeObject Photon where
+instance Kd.KdTreeObject Photon where
     blank = blankPhoton
     pos (Photon p _ _ _) = p
     setAxis (Photon p c d _) ax = Photon p c d ax

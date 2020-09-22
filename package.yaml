@@ -18,7 +18,7 @@ extra-source-files:
 - README.md
 - stack.yaml
 
-ghc-options: -Wall -O2 -fspecialise-aggressively -fexpose-all-unfoldings
+ghc-options: -Wall -O2 -fexpose-all-unfoldings # -fspecialise-aggressively 
 
 library:
   dependencies:
@@ -32,6 +32,7 @@ library:
   - MonadRandom
   - parallel
   - threads
+  - extra
   source-dirs: library
 
 executables:
@@ -45,8 +46,8 @@ executables:
     - array
     - MonadRandom
     ghc-options:
-#    - -rtsopts
     - -threaded
+#    - -rtsopts
 #    - -with-rtsopts=-N
 
 benchmarks:
