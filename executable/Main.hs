@@ -7,7 +7,9 @@ module Main where
 
 import Control.Monad.Random
 import qualified Data.Array as A
+import qualified Data.Vector as VB
 import Debug.Trace
+import System.Directory
 import OpalFalcon.BaseTypes
 import OpalFalcon.Images
 import qualified OpalFalcon.KdTree as Kd
@@ -31,9 +33,12 @@ import OpalFalcon.Scene.Objects.Triangle
 import OpalFalcon.Util.Random
 import OpalFalcon.VolumeMaterial
 -- import OpalFalcon.XTracing.PathTracer
+
+import OpalFalcon.XTracing.RayTraceUtils
 import OpalFalcon.XTracing.RayTracer
 import OpalFalcon.XTracing.XTracer
 import System.Environment
+import System.Process
 import System.Random
 
 mkQuadPrism pos xDir yDir zDir (V3 sx sy sz) mat =
@@ -104,49 +109,10 @@ cornellBox = MkScene
     qp0 = mkQuadPrism (V3 (-0.5) (-1) (-0.6)) (normalize $ V3 3 0 (-1)) yAxis (normalize $ V3 1 0 3) (V3 0.5 1 0.5) boxMat
     qp1 = mkQuadPrism (V3 1 (-1.5) 1) (normalize $ V3 3 0 1) yAxis (normalize $ V3 (-1) 0 3) (V3 0.75 0.5 0.75) blankMat
 
-sph :: Object
-
-sph1 :: Object
-
-ground :: Object
-
-ol :: ObjectList
-
-sc :: Scene ObjectList
-
 pSphereMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> Sphere -> Vec3d -> AppliedMaterial
 pSphereMat absorb scatter phase s hp = mkVolumeMat (ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = exitSphere s}) hp
 
 sphereMat refl (MkSphere s _) hp = mkSpecularMat refl (normalize (hp |-| (affineTranslate s)))
-
-planeMat refl (MkPlane (V4 _ _ n _)) _ = mkDiffuseMat refl (fromHomo n)
-
-discMat dif (MkDisc (MkPlane (V4 _ _ n _)) _) _ = mkDiffuseMat (V3 0.5 0.8 0.4) (fromHomo n)
-
-sph = mkSphereObject (MkSphere (mkAffineSpace (V3 (-2) 1.3 (-2)) xAxis yAxis zAxis) 1.5) (sphereMat (V3 0.8 0.4 0.4))
-
-sph1 = mkSphereObject (MkSphere (mkAffineSpace (V3 2 1.3 (-2)) xAxis yAxis zAxis) 1.5) (sphereMat (V3 0.4 0.8 0.4))
-
-ground = mkPlaneObject (MkPlane (mkAffineSpace (V3 0 (-2) 0) xAxis (negateVec zAxis) yAxis)) (planeMat (V3 0.5 0.5 0.5))
-
-dPlane = MkPlane (mkAffineSpace (V3 0 1.998 0) xAxis zAxis (negateVec yAxis))
-
-disc = mkDiscObject (MkDisc dPlane 2) (discMat (V3 0.4 0.6 0.6))
-
-ol = MkObjList {objList = [sph, sph1, ground, disc]}
-
-eol = MkObjList {objList = [disc]}
-
-sc =
-  ( MkScene
-      { objects = ol,
-        lightSources =
-          [ -- mkPointLight (V3 (-4) 0 0) (V3 1 1 1) 10,
-            -- mkPointLight (V3 6 0 2) (V3 1 1 1) 10,
-            mkDiscLight (MkDisc dPlane 2) whitef 100
-          ]
-      }
-  )
 
 printHits hs =
   foldl (++) "\n" $
@@ -157,28 +123,11 @@ printHits hs =
       )
       hs
 
--- Generate a bunch of points on a sphere
-spherePoints lonSteps latSteps radius pos =
-  [ ( V3
-        (radius * (cos theta) * (cos phi))
-        (radius * (sin theta))
-        (radius * (cos theta) * (sin phi))
-    )
-      |+| pos
-    | theta <- [(n * pi / latSteps - pi / 2) | n <- [1 .. (latSteps -1)]],
-      phi <- [(n * 2 * pi / lonSteps) | n <- [1 .. (lonSteps -1)]]
-  ]
-
 -- Filters the Nothing values out of a list
 filterJust :: [Maybe a] -> [a]
 filterJust [] = []
 filterJust ((Nothing) : xs) = filterJust xs
 filterJust ((Just x) : xs) = x : (filterJust xs)
-
--- spherePhotonShoot sc pow cnt pos =
---   do
---     rnd <- getRandoms
---     concat <$> (mapM (\d -> shootPhoton 0 sc (EPhoton (Ray pos d) (pow |/ (fromIntegral cnt)))) $ take cnt rnd)
 
 repeatMF :: (Monad m) => Integer -> m a -> m [a]
 repeatMF 0 f = return []
@@ -195,50 +144,140 @@ areaPhotonShoot sc pow cnt pos x2 y2 minBounce =
         ys <- (fmap (\a -> (2 * a -1) *| y2)) <$> getRandoms
         (\(a, b) -> (concat a, concat b)) <$> unzip <$> (mapM (\((d, x, y) :: (Vec3d, Vec3d, Vec3d)) -> shootPhoton minBounce sc (EPhoton (Ray (pos |+| x |+| y) d) (pow |/ (fromIntegral cnt)))) $ take cnt $ zip3 dirs xs ys)
 
-main :: IO ()
-main =
-  let w = 1000
-      h = 1000
-      -- pixs = pathTraceScene (globIllum pmap 200 1.0) (mkStdGen 0x1337beef) cornellBox cam h
+globalCam = Camera
+  { cameraPos = V3 0 0 7,
+    cameraDir = V3 0 0 (-1),
+    cameraUp = V3 0 1 0,
+    cameraFOV = 75,
+    cameraAspect = 1
+  }
+
+launchWorker :: (Show a) => String -> Int -> [a] -> IO ProcessHandle
+launchWorker bin wid xs =
+  do
+    writeFile ("job" ++ (show wid)) (show xs)
+    spawnProcess bin ["worker", (show wid)]
+
+joinWorker :: (Read a) => Int -> ProcessHandle -> IO [a]
+joinWorker wid p =
+  do
+    _ <- waitForProcess p
+    res <- read <$> (readFile $ "job" ++ (show wid))
+    removeFile $ "job" ++ (show wid)
+    return res
+
+stripeList' n i v =
+  if i >= VB.length v
+    then []
+    else (v VB.! i) : (stripeList' n (i + n) v)
+
+stripeList n l =
+  map (\i -> stripeList' n i v) [0 .. n -1]
+  where
+    v = VB.fromList l
+
+unstripeLists :: [[a]] -> [a]
+unstripeLists l =
+  let vecs = VB.fromList $ map VB.fromList l
+      totalLength = foldl (+) 0 $ fmap VB.length vecs
+      n = VB.length vecs
+      f i =
+        if i >= totalLength
+          then []
+          else
+            let vs =
+                  if i + n > totalLength
+                    then VB.slice 0 (totalLength - i) vecs
+                    else vecs
+                vals = VB.toList $ fmap (flip (VB.!) (i `div` n)) vs
+             in (vals) ++ (f (i + n))
+   in f 0
+
+mpMap :: (Show a, Read b) => Int -> (Int -> [a] -> IO c) -> (Int -> c -> IO [b]) -> [a] -> IO [b]
+mpMap n f_out f_in l =
+  let groups = zip [0 ..] $ stripeList n l
+   in do
+        print $ "Group count: " ++ (show $ length groups)
+        pids <- mapM (\(n, g) -> (f_out n g) >>= (\x -> return (n, x))) groups
+        unstripeLists <$> (mapM (\(n, p) -> f_in n p) pids)
+
+traceRays_ :: ObjectCollection o => RayTracer -> Scene o -> [(Integer, Ray)] -> IO [ColorRGBf]
+traceRays_ rt sc = mapM (\x -> evalRandIO $ traceRay rt sc x)
+
+runMaster :: [String] -> IO ()
+runMaster (workerBin : (numProcsStr : (hstr : _))) =
+  let incand = (V3 255 214 170)
+      wht = constVec 255
+      lightPow = ((50 / 255) *| wht)
+      h = read hstr
+      w = h
+      rays = zip [1 ..] $ genRays globalCam h
+      numProcs = read numProcsStr
+   in do
+        (sPhs, vPhs) <- evalRandIO $ areaPhotonShoot cornellBox lightPow 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5) 1 -- only indirect lighting
+        pixs <-
+          if numProcs == 1
+            then workerMain sPhs vPhs rays
+            else do
+              writeFile "sPmap.bin" (show sPhs)
+              writeFile "vPmap.bin" (show vPhs)
+              mpMap numProcs (launchWorker workerBin) joinWorker rays
+        saveToPngRtr "pngfile.png" pixs w h
+
+workerMain sPhs vPhs rays =
+  let sPmap = mkPhotonMap sPhs
+      vPmap = mkPhotonMap vPhs
       gil pmap pcount maxDist pos inc norm bssrdf = estimateRadiance pmap pcount pos inc maxDist bssrdf norm
       yesglil p = gil p 500 0.5
       noglil p _ _ _ _ = black
       volGlil pmap pCount maxDist pos inc phase = estimateVolumeRadiance pmap pCount pos inc maxDist phase
       yesVolGlil p = volGlil p 500 0.1
+      rt = RayTracer
+        { surfaceRadiance = yesglil sPmap,
+          volumeRadiance = yesVolGlil vPmap
+        }
+   in traceRays_ rt cornellBox rays
+
+runWorker :: [String] -> IO ()
+runWorker (wid : _) =
+  do
+    sPhs <- read <$> (readFile "sPmap.bin")
+    vPhs <- read <$> (readFile "vPmap.bin")
+    rays <- (read <$> (readFile ("job" ++ wid))) :: IO [(Integer, Ray)]
+    print $ take 10 $ map fst rays
+    pixs <- workerMain sPhs vPhs rays
+    print $ length pixs
+    writeFile ("job" ++ wid) (show pixs)
+
+printUsage :: IO ()
+printUsage =
+  do
+    print "Usage: [master|worker] height"
+
+main :: IO ()
+main =
+  let s = stripeList 10 [1 .. 999]
+      b = unstripeLists s
+   in -- pixs = pathTraceScene (globIllum pmap 200 1.0) (mkStdGen 0x1337beef) cornellBox cam h
       -- ptrcr = PathTracer {globalIllum = gil pmap 200 1.0}
       -- pixs = pathTraceScene ptrcr cornellBox h cam
       -- tph = shootPhoton cornellBox (mkStdGen 0xdeadbeef) (EPhoton (Ray (V3 0 0 0) (normalize $ V3 0.5 0.5 (-1))) whitef)
-      cam = Camera {cameraPos = V3 0 0 7, cameraDir = V3 0 0 (-1), cameraUp = V3 0 1 0, cameraFOV = 75, cameraAspect = 1}
-      incand = (V3 255 214 170)
-      wht = constVec 255
-      lightPow = ((50 / 255) *| wht)
-      genPmapImgs sPhs vPhs =
-        do
-          fbSurface <- return $ renderPhotons cornellBox cam h sPhs
-          fbVolume <- return $ renderPhotons emptyScene cam h vPhs
-          -- pixs <- return $ renderIlluminance (gil pmap 100 0.5) cornellBox cam h
-          saveToPngPmap "surface_pmap.png" ((100 *|) <$> (fbPixelList fbSurface)) (fbWidth fbSurface) (fbHeight fbSurface)
-          saveToPngPmap "volume_pmap.png" ((100 *|) <$> (fbPixelList fbVolume)) (fbWidth fbVolume) (fbHeight fbVolume)
-      rtScene args sPhs vPhs =
-        let rt = RayTracer
-              { surfaceRadiance = yesglil (mkPhotonMap sPhs),
-                volumeRadiance = yesVolGlil (mkPhotonMap vPhs)
-              }
-         in do
-              pixs <- rayTraceScene (read $ args !! 0) rt cornellBox (fromInteger h) cam
-              print $ length pixs
-              saveToPngRtr "pngfile.png" pixs w (fromInteger h)
-   in do
+      -- genPmapImgs sPhs vPhs =
+      --   do
+      --     fbSurface <- return $ renderPhotons cornellBox cam h sPhs
+      --     fbVolume <- return $ renderPhotons emptyScene cam h vPhs
+      --     -- pixs <- return $ renderIlluminance (gil pmap 100 0.5) cornellBox cam h
+      --     saveToPngPmap "surface_pmap.png" ((100 *|) <$> (fbPixelList fbSurface)) (fbWidth fbSurface) (fbHeight fbSurface)
+      --     saveToPngPmap "volume_pmap.png" ((100 *|) <$> (fbPixelList fbVolume)) (fbWidth fbVolume) (fbHeight fbVolume)
+      do
         args <- getArgs
-        (sPhs, vPhs) <- evalRandIO $ areaPhotonShoot cornellBox lightPow 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5) 1 -- only indirect lighting
         ops <-
           return
-            [ ("pmap", genPmapImgs sPhs vPhs),
-              ("testPar", testParallel),
-              ("testPar2", testParallel2 (read $ args !! 0))
+            [ ("master", runMaster $ tail args),
+              ("worker", runWorker $ tail args)
             ]
-        case lookup (args !! 1) ops of
-          Nothing -> rtScene args sPhs vPhs
+        case lookup (args !! 0) ops of
+          Nothing -> printUsage
           Just op -> op
 -- TODO: list
 -- Force stuff like luminance, radiance, etc. into type system to reduce mistakes; can we derive via?

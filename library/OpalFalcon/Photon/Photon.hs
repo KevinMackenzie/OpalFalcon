@@ -22,6 +22,7 @@ import qualified OpalFalcon.KdTree as Kd
 import Data.Bits
 import GHC.Exts
 import GHC.Float (double2Float)
+import GHC.Word (Word32)
 import GHC.ST (ST(..), runST)
 -- import OpalFalcon.Math.FastTrig
 
@@ -122,13 +123,13 @@ mkPhotonMap = Kd.mkKdTree
 
 -- A photon inside of the photon acceleration structure
 --                    pos   col       inc  flags
-data Photon = Photon Vec3d ColorRGBf Vec3d Kd.KdAxis deriving Show
+data Photon = Photon Vec3d ColorRGBf Vec3d Kd.KdAxis deriving (Show, Read)
 
 mkPhoton :: Vec3d -> ColorRGBf -> Vec3d -> Photon
 mkPhoton h c d = Photon h c d Kd.XAxis
 
 indexPhotonMap :: PhotonMap -> Int -> Photon
-indexPhotonMap (Kd.KdTree pmap) i = pmap VS.! i
+indexPhotonMap (Kd.KdTree pmap) i = pmap `VS.unsafeIndex` i
 
 -- TODO: we will want an option that lets us get a radiance estimate without converting to a list
 collectPhotons :: PhotonMap -> Int -> (Vec3d -> Bool) -> Vec3d -> Double -> ([Photon],Int)

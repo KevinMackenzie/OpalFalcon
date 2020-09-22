@@ -8,6 +8,7 @@ module OpalFalcon.XTracing.RayTracer
     splitList,
     testParallel,
     testParallel2,
+    traceRay,
   )
 where
 

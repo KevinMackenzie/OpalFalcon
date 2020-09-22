@@ -52,11 +52,11 @@ approxEq e v0 v1 = foldl (&&) True $ liftA2 (\x0 x1 -> (abs $ x0-x1) < e) v0 v1
 -- If we don't support pattern matching (like using vectors/arrays) we don't need 'data' declarations for each vector length
 -- Higher-order types
 data Vec2 a = V2 !a !a
-    deriving (Show, Eq, Foldable, Functor)
+    deriving (Show, Read, Eq, Foldable, Functor)
 data Vec3 a = V3 !a !a !a
-    deriving (Show, Eq, Foldable, Functor)
+    deriving (Show, Read, Eq, Foldable, Functor)
 data Vec4 a = V4 !a !a !a !a
-    deriving (Show, Eq, Foldable, Functor)
+    deriving (Show, Read, Eq, Foldable, Functor)
 
 -- Instances for low-dimmension vectors
 instance Applicative Vec2 where

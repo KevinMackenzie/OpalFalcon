@@ -45,6 +45,9 @@ executables:
     - random
     - array
     - MonadRandom
+    - process
+    - directory
+    - vector
     ghc-options:
     - -threaded
 #    - -rtsopts

@@ -31,7 +31,7 @@ class KdTreeObject a where
   setAxis :: a -> KdAxis -> a
 
 -- Helper type to build the tree
-data KdAxis = XAxis | YAxis | ZAxis deriving (Eq, Show)
+data KdAxis = XAxis | YAxis | ZAxis deriving (Eq, Show, Read)
 
 data KdTreeTree d = KdNode KdAxis d (KdTreeTree d) (KdTreeTree d) | KdNull deriving (Eq)
 

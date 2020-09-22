@@ -3,7 +3,7 @@ module OpalFalcon.Math.Ray where
 import OpalFalcon.Math.Vector
 
 data Ray = Ray Vec3d Vec3d
-    deriving (Eq, Show)
+    deriving (Eq, Show, Read)
 
 {-# INLINE pointAtParameter #-}
 pointAtParameter :: Ray -> Double -> Vec3d
