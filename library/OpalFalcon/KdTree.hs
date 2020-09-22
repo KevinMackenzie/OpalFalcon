@@ -17,8 +17,8 @@ module OpalFalcon.KdTree
   )
 where
 
--- import Data.Ix
-import Data.Array.Unboxed
+import qualified Data.Vector as VB
+import qualified Data.Vector.Storable as VS
 import Data.List (sortBy)
 import OpalFalcon.Math.Vector
 
@@ -106,21 +106,18 @@ treeToList kd = f kd b []
     b qs = foldl (foldr f) b qs []
 
 -- An immutable 3d kd tree with internal array representation
---      array type ; Index type ; data type
-data KdTree arr ix d = KdTree (arr ix d) deriving (Show)
+data KdTree v a = KdTree (v a) deriving (Show)
 
-type BoxedKdTree e = KdTree Array Int e
+type BoxedKdTree a = KdTree VB.Vector a
 
-mkKdTree :: (IArray arr a, KdTreeObject a) => [a] -> KdTree arr Int a
-mkKdTree l = KdTree $ listArray (1 :: Int, length l) $ treeToList $ balance l
+mkKdTree :: (VS.Storable a, KdTreeObject a) => [a] -> KdTree VS.Vector a
+mkKdTree l = KdTree $ VS.fromList $ treeToList $ balance l
 
-mkKdTree1 :: (IArray arr a, KdTreeObject a) => [a] -> KdTree arr Int a
-mkKdTree1 l = KdTree $ listArray (1 :: Int, length l) $ l
+mkKdTree1 :: (VS.Storable a, KdTreeObject a) => [a] -> KdTree VS.Vector a
+mkKdTree1 l = KdTree $ VS.fromList $ l
 
-kdTreeElems :: (IArray arr a, Ix i) => KdTree arr i a -> [a]
-kdTreeElems (KdTree a) = elems a
+kdTreeElems :: (VS.Storable a) => KdTree VS.Vector a -> [a]
+kdTreeElems (KdTree a) = VS.toList a
 
-kdTreeSize :: (IArray arr a, Ix i) => KdTree arr i a -> i
-kdTreeSize (KdTree a) =
-  let (_, l) = bounds a
-   in l
+kdTreeSize :: (VS.Storable a) => KdTree VS.Vector a -> Int
+kdTreeSize (KdTree a) = VS.length a
