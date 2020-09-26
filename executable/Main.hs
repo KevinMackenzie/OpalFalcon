@@ -9,7 +9,6 @@ import Control.Monad.Random
 import qualified Data.Array as A
 import qualified Data.Vector as VB
 import Debug.Trace
-import System.Directory
 import OpalFalcon.BaseTypes
 import OpalFalcon.Images
 import qualified OpalFalcon.KdTree as Kd
@@ -37,6 +36,7 @@ import OpalFalcon.VolumeMaterial
 import OpalFalcon.XTracing.RayTraceUtils
 import OpalFalcon.XTracing.RayTracer
 import OpalFalcon.XTracing.XTracer
+import System.Directory
 import System.Environment
 import System.Process
 import System.Random
@@ -205,7 +205,7 @@ traceRays_ :: ObjectCollection o => RayTracer -> Scene o -> [(Integer, Ray)] -> 
 traceRays_ rt sc = mapM (\x -> evalRandIO $ traceRay rt sc x)
 
 runMaster :: [String] -> IO ()
-runMaster (workerBin : (numProcsStr : (hstr : _))) =
+runMaster (workerBin : (numProcsStr : (hstr : (outFile : _)))) =
   let incand = (V3 255 214 170)
       wht = constVec 255
       lightPow = ((50 / 255) *| wht)
@@ -222,7 +222,7 @@ runMaster (workerBin : (numProcsStr : (hstr : _))) =
               writeFile "sPmap.bin" (show sPhs)
               writeFile "vPmap.bin" (show vPhs)
               mpMap numProcs (launchWorker workerBin) joinWorker rays
-        saveToPngRtr "pngfile.png" pixs w h
+        saveToPngRtr outFile pixs w h
 
 workerMain sPhs vPhs rays =
   let sPmap = mkPhotonMap sPhs
