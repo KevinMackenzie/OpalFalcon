@@ -6,6 +6,7 @@ module OpalFalcon.Photon.Photon (Photon(..), estimateRadiance, estimateVolumeRad
 
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Vector
+import OpalFalcon.Math.ConvexHull
 import OpalFalcon.Photon.STHeap
 
 import System.Random
@@ -31,6 +32,7 @@ type PhotonMap = Kd.KdTree VS.Vector Photon
 -- no-op
 cullSphere _ _ _ _ _ = False
 
+-- TODO: This should use a better volume approximation since points near the edge of an object are too dark (see quickhull algorithm)
 -- 'rPos' is the position in space; 'rSrcDir' is the direction the ray came from (flipped)
 estimateVolumeRadiance :: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> PhaseFunc -> ColorRGBf
 estimateVolumeRadiance pmap pCount rPos rSrcDir maxDist (PhaseFunc phase) = 
@@ -59,64 +61,13 @@ estimateRadiance pmap pCount hpos incDir maxDist (Bssrdf bssrdf) norm =
         pts = map (\(Photon pos _ _ _) -> pos) photons
         -- r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
         -- area = if r2 == 0 then Nothing else Just $ pi*r2
-        area = ((\x -> if x == 0 then trace ("Hit at (" ++ (show hpos) ++ ") wiht norm (" ++ (show norm) ++ ") and " ++ (show $ length pts) ++ " photons") x else x) . double2Float) <$> convexHullArea pts norm
+        area = ((\x -> if x == 0 then trace ("Hit at (" ++ (show hpos) ++ ") wiht norm (" ++ (show norm) ++ ") and " ++ (show $ length pts) ++ " photons") x else x) . double2Float) <$> convexHull2DArea pts norm
         r = case area of
             Nothing -> black -- No area means no photons or not enough
             Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (bssrdf (pos, inc) (hpos, incDir))) |+| c) black photons)
             -- If there are fewer than a certain percent of photons, try to avoid artifacts (questionable)
       in {-if ((fromIntegral (length pts)) < 0.05*(fromIntegral pCount)) then black else-} r
 
-
--- TODO: Theres an error in the convex hull code...
--- Finds the area of the convex hull containing all photons
-convexHullArea :: [Vec3d] -> Vec3d -> Maybe Double
-convexHullArea [] _ = Nothing -- Zero points: no area
-convexHullArea (_:[]) _ = Nothing -- One point: no area
-convexHullArea (_:(_:[])) _ = Nothing -- Two points: do something
-convexHullArea pts norm = 
-    let ((o,_):t) = convexHull pts norm
-        -- Use the dot product to get the area projected onto the plane
-        a2 = foldl (+) 0 $ map (\(p0, p1) -> norm |.| ((p0 |-| o) |><| (p1 |-| o))) t
-      in Just $ a2 / 2
-
-lstPairs' :: a -> [a] -> [(a,a)]
-lstPairs' x (h:[]) = [(h,x)]
-lstPairs' x (h:(t@(h':_))) = (h,h'):(lstPairs' x t)
--- Generates list of edges from an ordered list of vertices to form a closed polygon
-lstPairs :: [a] -> [(a,a)]
-lstPairs l@(h:_) = lstPairs' h l
-
-insideEdge :: Vec3d -> Vec3d -> Vec3d -> Vec3d -> Bool
-insideEdge p0 p1 pt norm = ((p1 |-| p0) |><| (pt |-| p0)) |.| norm >= 0
--- A set of functions that adds a point to a convex hull
-removePoint :: [(Vec3d, Vec3d)] -> Vec3d -> Vec3d -> Vec3d -> [(Vec3d, Vec3d)]
-removePoint [] p2 pt _ = [(pt,p2)]
-removePoint ((pn, pn1):t) _ pt norm = 
-    if insideEdge pn pn1 pt norm 
-        then (pt,pn):((pn,pn1):t) -- because of convexity assumption
-        else removePoint t pn1 pt norm
-insertPoint' :: [(Vec3d, Vec3d)] -> Vec3d -> Vec3d -> [(Vec3d, Vec3d)]
-insertPoint' [] _ _ = []
-insertPoint' ((pn, pn1):t) pt norm = 
-     if insideEdge pn pn1 pt norm 
-        then (pn,pn1):(insertPoint' t pt norm) 
-        else (pn,pt):(removePoint t pn1 pt norm)
--- The first point may be removed, so rotate the list until the first point won't be
--- TODO: this is awkward 
-insertPoint :: [(Vec3d, Vec3d)] -> Vec3d -> Vec3d -> [(Vec3d, Vec3d)]
-insertPoint [] _ _ = []
-insertPoint h@((pn, pn1):t) pt norm =
-    if insideEdge pn pn1 pt norm 
-        then (pn, pn1):(insertPoint' t pt norm)
-        else insertPoint (t ++ [(pn,pn1)]) pt norm
-
--- Finds the convex hull of a set of co-planar points
-convexHull :: [Vec3d] -> Vec3d -> [(Vec3d, Vec3d)]
-convexHull (p0:(p1:(p2:t))) norm =
-    let (p1', p2') = if insideEdge p0 p1 p2 norm then (p1, p2) else (p2,p1)
-        -- The initial convex hull (triangle)
-        tr = lstPairs [p0, p1', p2']
-     in foldl (\el pt -> insertPoint el pt norm) tr t
 
 mkPhotonMap :: [Photon] -> PhotonMap
 mkPhotonMap = Kd.mkKdTree

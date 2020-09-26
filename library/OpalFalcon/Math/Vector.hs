@@ -1,12 +1,16 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
 module OpalFalcon.Math.Vector where
 
 import Data.Word (Word8)
 import Control.Applicative(Applicative, (<*>), liftA2)
 import System.Random (Random(..), RandomGen)
 import GHC.Float (float2Double, double2Float)
+import qualified GHC.Storable as GS
+import qualified Foreign.Storable as FS
+import Foreign.Ptr (Ptr, castPtr)
 
 -- Base typeclasses
 class (Foldable a, Applicative a) => Vector a where {}
@@ -72,6 +76,35 @@ instance Applicative Vec3 where
     {-# INLINE (<*>) #-}
     (<*>) (V3 fx fy fz) (V3 x y z)  = (V3 (fx x) (fy y) (fz z))
 instance Vector Vec3 where {}
+
+-- TODO: This can be generic across storable types and vectors
+instance FS.Storable (Vec3 Double) where
+    {-# INLINE sizeOf #-}
+    sizeOf _ = 3*8
+    {-# INLINE alignment #-}
+    alignment _ = 3*8
+    {-# INLINE peekElemOff #-}
+    peekElemOff = peekVec3dOffPtr
+    {-# INLINE pokeElemOff #-}
+    pokeElemOff = pokeVec3dOffPtr
+
+{-# INLINE peekVec3dOffPtr #-}
+peekVec3dOffPtr :: Ptr Vec3d -> Int -> IO Vec3d
+peekVec3dOffPtr p i =
+    let readD x o = GS.readDoubleOffPtr (castPtr p) (x*3 + o)
+     in do 
+         x <- readD i 0
+         y <- readD i 1
+         z <- readD i 2
+         return $ V3 x y z
+{-# INLINE pokeVec3dOffPtr #-}
+pokeVec3dOffPtr :: Ptr Vec3d -> Int -> Vec3d -> IO ()
+pokeVec3dOffPtr p i (V3 x y z) =
+    let writeD x o v = GS.writeDoubleOffPtr (castPtr p) (x*3 + o) v
+     in do
+         writeD i 0 x
+         writeD i 1 y
+         writeD i 2 y
 
 instance Applicative Vec4 where
     {-# INLINE pure #-}
@@ -328,3 +361,19 @@ getOrthoVec v = normalize $ v |><| (if (mag (v |><| xAxis)) < 0.001 then yAxis e
 {-# INLINE isBetween #-}
 isBetween :: Vec3d -> Vec3d -> Vec3d -> Bool
 isBetween beg end x = (end |-| x) |.| (end |-| beg) < 0
+
+-- Computes the distance between a point and a line (dir is normalized)
+{-# INLINE pointToLine #-}
+pointToLine :: (Floating a) => Vec3 a -> Vec3 a -> Vec3 a -> a
+pointToLine lnPos lnDir pt =
+    sqrt $ (distance2 lnPos pt) - (prod*prod)
+        where prod = lnDir |.| (pt |-| lnPos)
+
+pointToPlane :: (Eq a, Floating a) => (Vec3 a, Vec3 a, Vec3 a) -> Vec3 a -> a
+pointToPlane plane pt = abs $ pointToPlaneSigned plane pt
+
+-- Points in non-degenerate plane in CCW ordering (pt1-pt0)x(pt2-pt0) > 0
+pointToPlaneSigned :: (Eq a, Floating a) => (Vec3 a, Vec3 a, Vec3 a) -> Vec3 a -> a
+pointToPlaneSigned (pt0, pt1, pt2) pt =
+    let norm = normalize $ (pt1 |-| pt0) |><| (pt2 |-| pt0)
+     in (pt |-| pt0) |.| norm
