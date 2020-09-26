@@ -33,6 +33,7 @@ library:
   - parallel
   - threads
   - extra
+  - containers
   source-dirs: library
 
 executables:
