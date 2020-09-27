@@ -429,6 +429,12 @@ convexHullSpec =
               correct = [MM.mkTri 0 1 2, MM.mkTri 2 1 3, MM.mkTri 3 1 5, MM.mkTri 5 1 0, MM.mkTri 0 2 4, MM.mkTri 2 3 4, MM.mkTri 3 5 4, MM.mkTri 5 0 4]
               (Just hull) = CH.quickhull3D points
            in do (Set.fromList hull) `shouldBe` (Set.fromList correct)
+      describe "convexHull3DVolume" $ do
+        it "works as expected" $
+          let points = VS.fromList [xAxis, yAxis, zAxis, negateVec xAxis, negateVec yAxis, negateVec zAxis, origin, origin, origin]
+              correct = [MM.mkTri 0 1 2, MM.mkTri 2 1 3, MM.mkTri 3 1 5, MM.mkTri 5 1 0, MM.mkTri 0 2 4, MM.mkTri 2 3 4, MM.mkTri 3 5 4, MM.mkTri 5 0 4]
+              vol = CH.convexHull3DVolume points
+           in do vol `shouldBe` (Just (8/6))
 
 stHeapSpec :: Spec
 stHeapSpec =
