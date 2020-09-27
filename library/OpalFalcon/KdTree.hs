@@ -8,18 +8,21 @@ module OpalFalcon.KdTree
     balance,
     findAABB,
     mkKdTree,
+    mkKdTreeBoxed,
     mkKdTree1,
     kdTreeElems,
+    kdTreeElemsBoxed,
     sortByDim,
     splitPoints,
     kdTreeSize,
-    axisElem
+    kdTreeSizeBoxed,
+    axisElem,
   )
 where
 
+import Data.List (sortBy)
 import qualified Data.Vector as VB
 import qualified Data.Vector.Storable as VS
-import Data.List (sortBy)
 import OpalFalcon.Math.Vector
 
 class KdTreeObject a where
@@ -113,11 +116,20 @@ type BoxedKdTree a = KdTree VB.Vector a
 mkKdTree :: (VS.Storable a, KdTreeObject a) => [a] -> KdTree VS.Vector a
 mkKdTree l = KdTree $ VS.fromList $ treeToList $ balance l
 
+mkKdTreeBoxed :: (KdTreeObject a) => [a] -> BoxedKdTree a
+mkKdTreeBoxed l = KdTree $ VB.fromList $ treeToList $ balance l
+
 mkKdTree1 :: (VS.Storable a, KdTreeObject a) => [a] -> KdTree VS.Vector a
 mkKdTree1 l = KdTree $ VS.fromList $ l
 
 kdTreeElems :: (VS.Storable a) => KdTree VS.Vector a -> [a]
 kdTreeElems (KdTree a) = VS.toList a
 
+kdTreeElemsBoxed :: BoxedKdTree a -> [a]
+kdTreeElemsBoxed (KdTree a) = VB.toList a
+
 kdTreeSize :: (VS.Storable a) => KdTree VS.Vector a -> Int
 kdTreeSize (KdTree a) = VS.length a
+
+kdTreeSizeBoxed :: BoxedKdTree a -> Int
+kdTreeSizeBoxed (KdTree a) = VB.length a

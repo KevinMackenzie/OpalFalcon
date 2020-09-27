@@ -2,7 +2,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE BangPatterns #-}
-module OpalFalcon.Photon.Photon (Photon(..), estimateRadiance, estimateVolumeRadiance, mkPhoton, mkPhotonMap, PhotonMap(..)) where
+module OpalFalcon.Photon.Photon (Photon(..), estimateRadiance, estimateVolumeRadiance, mkPhoton, mkPhotonMap, PhotonMap(..), packDirFlags, unpackDirFlags, packColor, unpackColor) where
 
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Vector
@@ -37,9 +37,9 @@ cullSphere _ _ _ _ _ = False
 estimateVolumeRadiance :: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> PhaseFunc -> ColorRGBf
 estimateVolumeRadiance pmap pCount rPos rSrcDir maxDist (PhaseFunc phase) = 
     let (photons, _) = collectPhotons pmap pCount (\_ -> False) rPos maxDist
-        pts = map (\(Photon pos _ _ _) -> pos) photons
-        r = double2Float $ sqrt $ foldl max 0 $ map (distance2 rPos) pts
-        volume = if r == 0 then Nothing else Just $ (4/3)*pi*r*r*r
+        pts = VS.fromList $ map (\(Photon pos _ _ _) -> pos) photons
+        -- r = double2Float $ sqrt $ foldl max 0 $ map (distance2 rPos) pts
+        volume = fmap double2Float $ convexHull3DVolume pts -- (4/3)*pi*r*r*r
         col = case volume of
             Nothing -> black
             Just v -> (1/v) *| (foldl (\c (Photon _ pow inc _) -> (pow |*| (phase inc rSrcDir)) |+| c) black photons)

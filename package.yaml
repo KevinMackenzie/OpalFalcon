@@ -79,6 +79,8 @@ tests:
     - HUnit
     - deepseq
     - call-stack
+    - vector
+    - containers
     ghc-options:
     - -rtsopts
     - -threaded

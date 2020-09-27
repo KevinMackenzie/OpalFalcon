@@ -104,7 +104,7 @@ pokeVec3dOffPtr p i (V3 x y z) =
      in do
          writeD i 0 x
          writeD i 1 y
-         writeD i 2 y
+         writeD i 2 z
 
 instance Applicative Vec4 where
     {-# INLINE pure #-}
