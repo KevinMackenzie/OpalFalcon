@@ -31,6 +31,7 @@ import qualified OpalFalcon.Photon.Photon as PH
 import qualified OpalFalcon.Photon.STHeap as STH
 import OpalFalcon.Scene.Camera
 import qualified OpalFalcon.Scene.Objects.Triangle as OTRI
+import System.Random
 import Test.HUnit.Lang
 import qualified Test.Tasty
 import Test.Tasty.Hspec
@@ -40,9 +41,9 @@ location = case reverse callStack of
   (_, loc) : _ -> Just loc
   [] -> Nothing
 
--- Like `assertEqual`, but it works with vector approximately-equal
-assertApproxEqual preface var expected actual =
-  unless (approxEq var actual expected) $ do
+-- Like `assertEqual`, but it works with user-provided predicates
+assertUser predicate preface actual expected =
+  unless (predicate actual expected) $ do
     (prefaceMsg `deepseq` expectedMsg `deepseq` actualMsg `deepseq` E.throwIO (HUnitFailure location $ ExpectedButGot prefaceMsg expectedMsg actualMsg))
   where
     prefaceMsg
@@ -51,7 +52,17 @@ assertApproxEqual preface var expected actual =
     expectedMsg = show expected
     actualMsg = show actual
 
-shouldBeApprox a e = assertApproxEqual "" 0.001 e a
+assertApproxEqual :: (Show (a b), Vector a, Floating b, Ord b) => b -> a b -> a b -> IO ()
+assertApproxEqual e = assertUser (approxEq e) ""
+
+shouldBeApprox :: (Show (a b), Vector a, Floating b, Ord b) => a b -> a b -> IO ()
+shouldBeApprox = assertApproxEqual 0.001
+
+assertApproxEqualS :: (Show a, Floating a, Ord a) => a -> a -> a -> IO ()
+assertApproxEqualS e = assertUser (\a b -> abs (a - b) < e) ""
+
+shouldBeApproxS :: (Show a, Floating a, Ord a) => a -> a -> IO ()
+shouldBeApproxS = assertApproxEqualS 0.001
 
 main :: IO ()
 main = do
@@ -280,7 +291,7 @@ photonSpec =
          in do
               ((PH.packDirFlags dir flags) `shouldBe` packed)
               (f' `shouldBe` flags)
-              (assertApproxEqual "" 0.01 dir d')
+              (assertApproxEqual 0.01 dir d')
 
 convexHullSpec :: Spec
 convexHullSpec =
@@ -354,6 +365,10 @@ convexHullSpec =
               extrema = CH.pointCloudExtrema (map vecCompComp [xPos, yPos, zPos]) points
            in do extrema `shouldBe` [(3, 0), (4, 1), (5, 2)]
       describe "createSimplex" $ do
+        it "errors in the empty set case" $
+          let points = VS.empty
+              seed = CH.createSimplex points
+           in do seed `shouldBe` Nothing
         it "errors in 0d case" $
           let points = VS.fromList [origin, origin, origin, origin]
               seed = CH.createSimplex points
@@ -434,7 +449,12 @@ convexHullSpec =
           let points = VS.fromList [xAxis, yAxis, zAxis, negateVec xAxis, negateVec yAxis, negateVec zAxis, origin, origin, origin]
               correct = [MM.mkTri 0 1 2, MM.mkTri 2 1 3, MM.mkTri 3 1 5, MM.mkTri 5 1 0, MM.mkTri 0 2 4, MM.mkTri 2 3 4, MM.mkTri 3 5 4, MM.mkTri 5 0 4]
               vol = CH.convexHull3DVolume points
-           in do vol `shouldBe` (Just (8/6))
+           in do vol `shouldBe` (Just (8 / 6))
+        it "works on large set" $
+          do
+            stdgen <- getStdGen
+            let (Just vol) = CH.convexHull3DVolume $ VS.fromList $ take 10000 $ randoms stdgen
+             in (assertApproxEqualS 0.01 vol ((4.0 / 3) * pi))
 
 stHeapSpec :: Spec
 stHeapSpec =

@@ -109,7 +109,6 @@ convexHull3D points = (map MM.triTuple) <$> (quickhull3D points)
 convexHull3DVolume :: VS.Vector Vec3d -> Maybe Double
 convexHull3DVolume points = (meshVolume points) <$> (convexHull3D points)
 
--- TODO: Update with new MM.Tri data type
 data QuickheapMesh s
   = QM
       { qmMesh :: MM.MutableMesh s,
@@ -306,16 +305,19 @@ createSimplex points =
       v2 = points VS.! pt2
       v3 = points VS.! pt3
       pt3Dist = pointToPlaneSigned (v0, v1, v2) v3
-   in if null extremaList
-        then Nothing -- degenerate case (0d)
+   in if VS.null points
+        then Nothing -- degenerate case (no points)
         else
-          if pointToLine v0 vec v2 == 0
-            then Nothing -- degenerate case (1d)
+          if null extremaList
+            then Nothing -- degenerate case (0d)
             else
-              if pt3Dist == 0
-                then Nothing -- degenerate case (2d)
+              if pointToLine v0 vec v2 == 0
+                then Nothing -- degenerate case (1d)
                 else
-                  Just $
-                    if pt3Dist < 0
-                      then (pt2, pt1, pt0, pt3) -- Negative sign, flip triangle
-                      else (pt0, pt1, pt2, pt3)
+                  if pt3Dist == 0
+                    then Nothing -- degenerate case (2d)
+                    else
+                      Just $
+                        if pt3Dist < 0
+                          then (pt2, pt1, pt0, pt3) -- Negative sign, flip triangle
+                          else (pt0, pt1, pt2, pt3)
