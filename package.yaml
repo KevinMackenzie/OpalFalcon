@@ -81,6 +81,7 @@ tests:
     - call-stack
     - vector
     - containers
+    - random
     ghc-options:
     - -rtsopts
     - -threaded
