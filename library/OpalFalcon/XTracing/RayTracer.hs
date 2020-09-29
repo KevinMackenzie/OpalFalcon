@@ -19,7 +19,6 @@ import Control.Parallel
 import Data.Functor.Identity
 import Data.Maybe
 import Debug.Trace
-import Debug.Trace
 import GHC.Float (double2Float, float2Double)
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Ray
@@ -68,10 +67,10 @@ participateMedia rt sc (ParticipatingMaterial {participateAbsorb = absorb, parti
         let deltaPos = distance eventPos prevPos
             deltaPosF = double2Float deltaPos
             prevContrib = attenuateMedium eventPos prevRad deltaPos
-            multiScattering = volumeRadiance rt eventPos lightDir phase
          in do
               -- Note: To avoid aliasing, jitter the sample location around 'eventPos'
               singleScattering <- directContribution eventPos
+              multiScattering <- return $ volumeRadiance rt eventPos lightDir phase
               return $ (singleScattering |* deltaPosF) |+| (multiScattering |* deltaPosF) |+| prevContrib
       -- Only factors in the attenuation through the medium
       stepDirectOnly samplePos prevPos prevRad =
@@ -116,7 +115,7 @@ directIllum scene pos rInDir norm (Bssrdf bssrdf) =
               samples
         return $ vecSum contribs
 
-traceRay :: (Monad m, RandomGen g, ObjectCollection o) => RayTracer -> Scene o -> (Integer, Ray) -> RandT g m ColorRGBf
+traceRay :: (ObjectCollection o) => RayTracer -> Scene o -> (Integer, Ray) -> IO ColorRGBf
 traceRay rt sc ray =
   let glob = surfaceRadiance rt
       shootRay ray path
@@ -127,25 +126,26 @@ traceRay rt sc ray =
           Nothing -> return $ V3 0 1 0 -- Background color
           Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
             let iDir = negateVec $ normalize hDir
-                pass oPos oDir (Bssrdf bssrdf) = passRefl oPos oDir $ bssrdf (pos, iDir) (oPos, oDir)
-                passRefl oPos oDir refl = (refl |*|) <$> (shootRay (advanceRay (Ray oPos oDir) ptEpsilon) (HSpec : path))
+                pass oPos oDir = shootRay (advanceRay (Ray oPos oDir) ptEpsilon) (HSpec : path)
+                passRefl oPos oDir refl = (refl |*|) <$> (pass oPos oDir)
              in do
                   rayResult <- transmitRay m iDir
                   case rayResult of
                     RayTerm ->
-                      liftM2
-                        (|+|)
-                        (return $ glob pos iDir norm (surfaceBssrdf m)) -- Indirect
-                        (directIllum sc pos iDir norm (surfaceBssrdf m)) -- Direct
+                      let indirect = glob pos iDir norm (surfaceBssrdf m)
+                       in do
+                            direct <- directIllum sc pos iDir norm (surfaceBssrdf m)
+                            return $ indirect |+| direct
                     RayReflect oDir refl -> passRefl pos oDir refl
                     RayParticipate pMat ->
                       -- Increment hit position so we are sure we're inside the geometry
                       let lInPos = participateExit pMat $ advanceRay (Ray pos hDir) ptEpsilon
                           (Ray oPos oDir) = advanceRay (Ray lInPos hDir) ptEpsilon
                        in do
-                            incomingRad <- pass oPos oDir (surfaceBssrdf m)
-                            vecAverage <$> (replicateM 100 $ participateMedia rt sc pMat lInPos pos incomingRad)
-      mf (n, x) = shootRay x []
+                            incomingRad <- pass oPos oDir
+                            samples <- replicateM 100 (participateMedia rt sc pMat lInPos pos incomingRad)
+                            return $ vecAverage samples
+      mf (n, x) = evalRandIO $ shootRay x []
    in mf ray
 
 startThreads :: (a -> IO b) -> [a] -> IO [(ThreadId, IO (Thread.Result b))]
@@ -187,7 +187,7 @@ mtMapM n f l =
 rayTraceScene :: (ObjectCollection o) => Int -> RayTracer -> Scene o -> Int -> Camera -> IO [ColorRGBf]
 rayTraceScene n rt sc height cam =
   let l = zip [1 ..] (genRays cam height)
-      f x = evalRandIO $ traceRay rt sc x
+      f x = traceRay rt sc x
    in mtMapM n f l
 
 testParallel2 n =

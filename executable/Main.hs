@@ -202,7 +202,7 @@ mpMap n f_out f_in l =
         unstripeLists <$> (mapM (\(n, p) -> f_in n p) pids)
 
 traceRays_ :: ObjectCollection o => RayTracer -> Scene o -> [(Integer, Ray)] -> IO [ColorRGBf]
-traceRays_ rt sc = mapM (\x -> evalRandIO $ traceRay rt sc x)
+traceRays_ rt sc = mapM (\x -> traceRay rt sc x)
 
 runMaster :: [String] -> IO ()
 runMaster (workerBin : (numProcsStr : (hstr : (outFile : _)))) =
