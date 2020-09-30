@@ -36,13 +36,13 @@ cullSphere _ _ _ _ _ = False
 -- 'rPos' is the position in space; 'rSrcDir' is the direction the ray came from (flipped)
 estimateVolumeRadiance :: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> PhaseFunc -> ColorRGBf
 estimateVolumeRadiance pmap pCount rPos rSrcDir maxDist (PhaseFunc phase) = 
-    let photons = collectPhotons pmap pCount (\_ -> False) rPos maxDist
-        pts = VS.map (\(Photon pos _ _ _) -> pos) photons
+    let (photons, _) = collectPhotons pmap pCount (\_ -> False) rPos maxDist
+        pts = VS.fromList $ map (\(Photon pos _ _ _) -> pos) photons
         -- r = double2Float $ sqrt $ foldl max 0 $ map (distance2 rPos) pts
         volume = fmap double2Float $ convexHull3DVolume pts -- (4/3)*pi*r*r*r
         col = case volume of
             Nothing -> black
-            Just v -> (1/v) *| (VS.foldl (\c (Photon _ pow inc _) -> (pow |*| (phase inc rSrcDir)) |+| c) black photons)
+            Just v -> (1/v) *| (foldl (\c (Photon _ pow inc _) -> (pow |*| (phase inc rSrcDir)) |+| c) black photons)
      in col
 
 cullCylinder:: Vec3d -> Double -> Double -> Vec3d -> Vec3d -> Bool
@@ -57,14 +57,14 @@ cullCylinder dir r h pos x
 --  up to a maximum distance before giving up. 'incdir' is flipped
 estimateRadiance:: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> Bssrdf -> Vec3d -> ColorRGBf
 estimateRadiance pmap pCount hpos incDir maxDist (Bssrdf bssrdf) norm = 
-    let photons = collectPhotons pmap pCount (cullCylinder norm maxDist (0.001*maxDist) hpos) hpos maxDist
-        pts = VS.toList $ VS.map (\(Photon pos _ _ _) -> pos) photons
+    let (photons, cnt) = collectPhotons pmap pCount (cullCylinder norm maxDist (0.001*maxDist) hpos) hpos maxDist
+        pts = map (\(Photon pos _ _ _) -> pos) photons
         -- r2 = double2Float $ foldl max 0 $ map (distance2 hpos) pts
         -- area = if r2 == 0 then Nothing else Just $ pi*r2
         area = ((\x -> if x == 0 then trace ("Hit at (" ++ (show hpos) ++ ") wiht norm (" ++ (show norm) ++ ") and " ++ (show $ length pts) ++ " photons") x else x) . double2Float) <$> convexHull2DArea pts norm
         r = case area of
             Nothing -> black -- No area means no photons or not enough
-            Just a -> (1/a) *| (VS.foldl (\c (Photon pos pow inc _) -> (pow |*| (bssrdf (pos, inc) (hpos, incDir))) |+| c) black photons)
+            Just a -> (1/a) *| (foldl (\c (Photon pos pow inc _) -> (pow |*| (bssrdf (pos, inc) (hpos, incDir))) |+| c) black photons)
             -- If there are fewer than a certain percent of photons, try to avoid artifacts (questionable)
       in {-if ((fromIntegral (length pts)) < 0.05*(fromIntegral pCount)) then black else-} r
 
@@ -83,7 +83,7 @@ indexPhotonMap :: PhotonMap -> Int -> Photon
 indexPhotonMap (Kd.KdTree pmap) i = pmap `VS.unsafeIndex` i
 
 -- TODO: we will want an option that lets us get a radiance estimate without converting to a list
-collectPhotons :: PhotonMap -> Int -> (Vec3d -> Bool) -> Vec3d -> Double -> VS.Vector Photon
+collectPhotons :: PhotonMap -> Int -> (Vec3d -> Bool) -> Vec3d -> Double -> ([Photon],Int)
 collectPhotons pmap n cull x maxDist = 
     let pmapSize = Kd.kdTreeSize pmap
         recurse p heap d2 = 

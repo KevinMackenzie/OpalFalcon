@@ -12,26 +12,20 @@ module OpalFalcon.Photon.STHeap
 where
 
 import Control.Monad
-import Control.Monad.Primitive (PrimMonad, PrimState)
 import Control.Monad.ST
 import Data.STRef
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Storable.Mutable as VSM
-import Foreign.Storable (Storable)
 
 -- TODO: replace all vector ops with unsafe ones once we know it is stable
 
 {-# INLINE readOneBased #-}
-readOneBased :: (PrimMonad m, Storable a) => VSM.MVector (PrimState m) a -> Int -> m a
+readOneBased :: (PrimMonad m, Storable a) => MVector (PrimState m) a -> Int -> m a
 readOneBased vec idx = VSM.read vec (idx -1)
 
 {-# INLINE writeOneBased #-}
-writeOneBased :: (PrimMonad m, Storable a) => VSM.MVector (PrimState m) a -> Int -> a -> m ()
+writeOneBased :: (PrimMonad m, Storable a) => MVector (PrimState m) a -> Int -> a -> m ()
 writeOneBased vec idx = VSM.write vec (idx -1)
-
-{-# INLINE swapOneBased #-}
-swapOneBased :: (PrimMonad m, Storable a) => VSM.MVector (PrimState m) a -> Int -> Int -> m ()
-swapOneBased vec idx0 idx1 = VSM.swap vec (idx0 -1) (idx1 -1)
 
 -- This is a max-heap
 data STHeap s e p = STHeap (e -> p) Int (STRef s Int) (VSM.MVector s e)
@@ -51,7 +45,8 @@ percolateUp p h@(STHeap pr _ sz vec) =
         val <- readOneBased vec p
         pval <- readOneBased vec parentIdx
         when ((pr val) > (pr pval)) $ do
-          swapOneBased vec p parentIdx
+          writeOneBased vec parentIdx val
+          writeOneBased vec p pval
           percolateUp parentIdx h
 
 -- NOTE: only call this on a full heap
@@ -74,7 +69,8 @@ percolateDown p h@(STHeap pr cap _ vec) =
                     then (lChild, lVal)
                     else (rChild, rVal)
           when ((pr cVal) > (pr pVal)) $ do
-            swapOneBased vec p cIdx
+            writeOneBased vec p cVal
+            writeOneBased vec cIdx pVal
             percolateDown cIdx h
 
 -- replaces highest priority item
@@ -105,6 +101,6 @@ getHeapSize (STHeap _ _ sz _) = readSTRef sz
 
 getHeapContents :: (Storable e) => STHeap s e p -> ST s (VS.Vector e)
 getHeapContents (STHeap pr cap sz vec) = do
-  vecImmutable <- VS.freeze vec
+  vecImmutable <- VSM.freeze vec
   numElems <- readSTRef sz
   return $ VS.take numElems vecImmutable
