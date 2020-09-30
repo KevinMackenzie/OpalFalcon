@@ -32,15 +32,16 @@ type PhotonMap = Kd.KdTree VS.Vector Photon
 -- no-op
 cullSphere _ _ _ _ _ = False
 
--- TODO: This should use a better volume approximation since points near the edge of an object are too dark (see quickhull algorithm)
 -- 'rPos' is the position in space; 'rSrcDir' is the direction the ray came from (flipped)
 estimateVolumeRadiance :: PhotonMap -> Int -> Vec3d -> Vec3d -> Double -> PhaseFunc -> ColorRGBf
 estimateVolumeRadiance pmap pCount rPos rSrcDir maxDist (PhaseFunc phase) = 
     let (photons, _) = collectPhotons pmap pCount (\_ -> False) rPos maxDist
         pts = VS.fromList $ map (\(Photon pos _ _ _) -> pos) photons
-        -- r = double2Float $ sqrt $ foldl max 0 $ map (distance2 rPos) pts
-        volume = fmap double2Float $ convexHull3DVolume pts -- (4/3)*pi*r*r*r
-        col = case volume of
+        r = double2Float $ sqrt $ VS.foldl max 0 $ VS.map (distance2 rPos) pts
+        volume = if VS.length pts == 0 then Nothing else Just $ (4/3)*pi*r*r*r
+        -- TODO: This looks more wrong with the convex hull alg (negative volumes :/)
+        -- volume0 = double2Float <$> (convexHull3DVolume pts)
+        col = case volume of 
             Nothing -> black
             Just v -> (1/v) *| (foldl (\c (Photon _ pow inc _) -> (pow |*| (phase inc rSrcDir)) |+| c) black photons)
      in col
