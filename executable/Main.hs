@@ -105,7 +105,7 @@ cornellBox = MkScene
     light0 = mkTriangleObject light0Tri lightMat
     light1 = mkTriangleObject light1Tri lightMat
     sphre = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (sphereMat (V3 0.9 0.9 0.6))
-    pSphere = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (pSphereMat (\_ -> constVec 0.4) (\_ -> constVec 0.2) (PhaseFunc (\_ _ -> whitef |/ (4 * pi))))
+    pSphere = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (pSphereMat (\_ -> constVec 0.2) (\_ -> constVec 0.6) (PhaseFunc (\_ _ -> whitef |/ (4 * pi))))
     qp0 = mkQuadPrism (V3 (-0.5) (-1) (-0.6)) (normalize $ V3 3 0 (-1)) yAxis (normalize $ V3 1 0 3) (V3 0.5 1 0.5) boxMat
     qp1 = mkQuadPrism (V3 1 (-1.5) 1) (normalize $ V3 3 0 1) yAxis (normalize $ V3 (-1) 0 3) (V3 0.75 0.5 0.75) blankMat
 
@@ -231,7 +231,7 @@ workerMain sPhs vPhs rays =
       yesglil p = gil p 500 0.5
       noglil p _ _ _ _ = black
       volGlil pmap pCount maxDist pos inc phase = estimateVolumeRadiance pmap pCount pos inc maxDist phase
-      yesVolGlil p = volGlil p 500 0.1
+      yesVolGlil p = volGlil p 500 0.2
       rt = RayTracer
         { surfaceRadiance = yesglil sPmap,
           volumeRadiance = yesVolGlil vPmap
