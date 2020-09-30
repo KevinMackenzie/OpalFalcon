@@ -34,6 +34,7 @@ library:
   - threads
   - extra
   - containers
+  - primitive
   source-dirs: library
 
 executables:
