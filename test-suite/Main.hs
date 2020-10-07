@@ -16,6 +16,7 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Data.STRef
 import qualified Data.Set as Set
+import qualified Data.Vector as VB
 import qualified Data.Vector.Storable as VS
 import GHC.ST (ST (..), runST)
 import OpalFalcon.BaseTypes
@@ -26,6 +27,7 @@ import qualified OpalFalcon.Math.MMesh as MM
 import qualified OpalFalcon.Math.Matrix as M
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
+import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
 import qualified OpalFalcon.Photon.Photon as PH
 import qualified OpalFalcon.Photon.STHeap as STH
@@ -75,7 +77,21 @@ main = do
   cameraTests <- testSpec "OpalFalcon.Scene.Camera" cameraSpec
   triangleTests <- testSpec "OpalFalcon.Scene.Objects.Triangle" triangleSpec
   stHeapTests <- testSpec "OpalFalcon.Photon.STHeap" stHeapSpec
-  Test.Tasty.defaultMain $ Test.Tasty.testGroup "OpalFalcon" [kdTreeTests, photonTests, convexHullTests, vectorTests, matrixTests, transformationsTests, cameraTests, triangleTests, stHeapTests]
+  triMeshTests <- testSpec "OpalFalcon.Math.TriMesh" triMeshSpec
+  Test.Tasty.defaultMain $
+    Test.Tasty.testGroup
+      "OpalFalcon"
+      [ kdTreeTests,
+        photonTests,
+        convexHullTests,
+        vectorTests,
+        matrixTests,
+        transformationsTests,
+        cameraTests,
+        triangleTests,
+        stHeapTests,
+        triMeshTests
+      ]
 
 -- Only test non-trivial operations on vectors
 vectorSpec :: Spec
@@ -486,3 +502,13 @@ stHeapSpec =
             STH.getHeapContents heap
        in do
             (lst `shouldBe` ([constVec 5, constVec 5, constVec 5, constVec 1, constVec 4, constVec 2, constVec 5], 7))
+
+triMeshSpec :: Spec
+triMeshSpec =
+  describe "TriMesh" $ do
+    it "Merges" $
+      let tm0 = TMesh.new (VS.fromList [V3 0 0 0, V3 1 1 1, V3 1 1 0]) (VB.fromList [MM.mkTri 0 1 2])
+          tm1 = TMesh.new (VS.fromList [V3 3 0 0, V3 3 1 1, V3 3 1 0]) (VB.fromList [MM.mkTri 0 1 2])
+          merged = TMesh.merge [tm0, tm1]
+       in do
+            (VB.toList $ TMesh.tris merged) `shouldBe` [MM.mkTri 0 1 2, MM.mkTri 3 4 5]

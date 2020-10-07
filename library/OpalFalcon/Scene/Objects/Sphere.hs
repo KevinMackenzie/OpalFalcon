@@ -6,6 +6,8 @@ module OpalFalcon.Scene.Objects.Sphere
   )
 where
 
+-- TODO: Most of this can be moved into "math" and only the hit-construction can stay here
+
 import Debug.Trace
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Ray
@@ -33,13 +35,13 @@ calcSphereHit sphere@(MkSphere space _) mat r p =
           hitMat = mat sphere hPos
         }
 
-exitSphere :: Sphere -> Ray -> Vec3d
+exitSphere :: Sphere -> Ray -> Maybe Vec3d
 exitSphere s@(MkSphere space rad) r@(Ray pos _) =
   if distance (spacePos space) pos > rad
-    then trace ("Point " ++ (show pos) ++ " was not in sphere! (" ++ (show $ spacePos space) ++ ", r=" ++ (show rad) ++ "): " ++ (show $ distance (spacePos space) pos)) undefined
+    then trace ("Point " ++ (show pos) ++ " was not in sphere! (" ++ (show $ spacePos space) ++ ", r=" ++ (show rad) ++ "): " ++ (show $ distance (spacePos space) pos)) Nothing
     else case intersectSphere s r of
       Nothing -> trace "Point was in sphere, but didn't intersect...!?" undefined
-      Just p -> pointAtParameter r p
+      Just p -> Just $ pointAtParameter r p
 
 -- performs sphere intersection
 intersectSphere :: Sphere -> Ray -> Maybe Double

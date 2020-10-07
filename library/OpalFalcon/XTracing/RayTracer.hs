@@ -79,18 +79,23 @@ participateMedia rt sc (ParticipatingMaterial {participateAbsorb = absorb, parti
         let fromLightDir = normalize $ sPos |-| lPos
          in case probeCollection (objects sc) (Ray lPos $ fromLightDir) of
               Nothing -> True
-              Just h -> (hitPos h) ~= (probeInside (Ray sPos $ negateVec fromLightDir))
+              Just h -> case (probeInside (Ray sPos $ negateVec fromLightDir)) of
+                Nothing -> False -- Thin geometry
+                Just exPos -> (hitPos h) ~= exPos
       directContribution samplePos =
         do
           samples <- (filter (filterSample samplePos)) <$> (sampleLights sc)
           contribs <-
             mapM
               ( \(LightSample lPos (AttenuationFunc atten) col) ->
-                  marchGeneric
-                    stepDirectOnly
-                    samplePos
-                    (probeInside $ Ray samplePos $ normalize $ lPos |-| samplePos)
-                    (col |* (atten samplePos))
+                  case (probeInside $ Ray samplePos $ normalize $ lPos |-| samplePos) of
+                    Nothing -> return black -- Thin geometry
+                    Just exPos ->
+                      marchGeneric
+                        stepDirectOnly
+                        samplePos
+                        exPos
+                        (col |* (atten samplePos))
               )
               samples
           return $ vecSum contribs
@@ -126,8 +131,8 @@ traceRay rt sc ray =
           Nothing -> return $ V3 0 1 0 -- Background color
           Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
             let iDir = negateVec $ normalize hDir
-                pass oPos oDir = shootRay (advanceRay (Ray oPos oDir) ptEpsilon) (HSpec : path)
-                passRefl oPos oDir refl = (refl |*|) <$> (pass oPos oDir)
+                pass oRay = shootRay (advanceRay oRay ptEpsilon) (HSpec : path)
+                passRefl oRay refl = (refl |*|) <$> (pass oRay)
              in do
                   rayResult <- transmitRay m iDir
                   case rayResult of
@@ -136,13 +141,14 @@ traceRay rt sc ray =
                        in do
                             direct <- directIllum sc pos iDir norm (surfaceBssrdf m)
                             return $ indirect |+| direct
-                    RayReflect oDir refl -> passRefl pos oDir refl
+                    RayReflect oDir refl -> passRefl (Ray pos oDir) refl
                     RayParticipate pMat ->
                       -- Increment hit position so we are sure we're inside the geometry
-                      let lInPos = participateExit pMat $ advanceRay (Ray pos hDir) ptEpsilon
-                          (Ray oPos oDir) = advanceRay (Ray lInPos hDir) ptEpsilon
-                       in do
-                            incomingRad <- pass oPos oDir
+                      case participateExit pMat $ advanceRay (Ray pos hDir) ptEpsilon of
+                        Nothing -> pass $ Ray pos hDir -- Thin geometry
+                        Just lInPos ->
+                          do
+                            incomingRad <- pass $ Ray pos hDir -- OK because ignoring interior hits
                             samples <- replicateM 100 (participateMedia rt sc pMat lInPos pos incomingRad)
                             return $ vecAverage samples
       mf (n, x) = evalRandIO $ shootRay x []

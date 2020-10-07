@@ -19,8 +19,10 @@ mkVolumeMat mat@(ParticipatingMaterial {participateAbsorb = absorb, participateS
       brdf _ _ = whitef |/ pi -- If we are using the brdf, its rendering diffuse
           -- TODO: This should be factored out
       traceScatterPhoton gen eph@(EPhoton r@(Ray prevPos dir) pow) =
-        let exitPos = probe r
-         in do
+        case probe r of
+          Nothing -> return ([], Just eph) -- Thin geometry
+          Just exitPos ->
+            do
               (Ray eventPos _) <- randNextEvt r
               if isBetween prevPos exitPos eventPos
                 then-- The photon exited the volume before an event occured
@@ -32,7 +34,7 @@ mkVolumeMat mat@(ParticipatingMaterial {participateAbsorb = absorb, participateS
                         rand0 <- getRandom -- Russian-Roulette the scattering/absorbing
                         if rand0 <= eventAlbedoAvg
                           then do
-                            outDir <- getRandom -- importance sample phase function
+                            outDir <- getRandom -- importance sample phase function (only this part is not generic)
                             (l, ex) <-
                               traceScatterPhoton
                                 (gen + 1)

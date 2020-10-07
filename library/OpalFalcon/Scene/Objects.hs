@@ -8,8 +8,9 @@ import OpalFalcon.Scene.Objects.DiscLight as DL
 import OpalFalcon.Scene.Objects.Plane as P
 import OpalFalcon.Scene.Objects.PointLight as PL
 import OpalFalcon.Scene.Objects.Sphere as S
-import OpalFalcon.Scene.Objects.Triangle as T
 import OpalFalcon.Scene.Objects.TriLight as TL
+import OpalFalcon.Scene.Objects.Triangle as T
+import qualified OpalFalcon.Math.TriMesh as TMesh
 
 -- TODO: this is not straightforward.  Make constructors from objects and their materials.  The separation is so we can have the same objects rendered with different materials so real-time interface can use simple materials?  Or maybe we can just use the 'diffuse' component of the material?
 
@@ -40,6 +41,13 @@ mkTriangleObject triangle mat =
   Bt.MkObj
     { objPos = T.trianglePos triangle,
       objIntersectRay = T.hittestTriangleFront triangle mat
+    }
+
+mkTriMeshObject :: TMesh.TriMesh -> TMesh.TriMeshMat -> Bt.Object
+mkTriMeshObject mesh mat =
+  Bt.MkObj
+    { objPos = origin, -- TODO
+      objIntersectRay = TMesh.hittestTriMeshOutside mesh mat
     }
 
 mkDiscLight :: D.Disc -> ColorRGBf -> Float -> LightSource

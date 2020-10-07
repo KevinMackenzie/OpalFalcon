@@ -7,6 +7,8 @@ module OpalFalcon.Math.MMesh
     triEdges,
     otherTriEdges,
     new,
+    freezeEdges,
+    freezePolys,
     idxVerts,
     addTri,
     removeTri,
@@ -105,6 +107,18 @@ new vs =
         e <- VBM.replicate vcount []
         p <- VBM.replicate vcount []
         return $ MM {vertices = vs, edges = e, polys = p}
+
+freezeEdges :: MutableMesh s -> ST s (VB.Vector (VS.Vector Int))
+freezeEdges mesh =
+  do
+    e <- VB.freeze (edges mesh)
+    return $ VB.map VS.fromList e
+
+freezePolys :: MutableMesh s -> ST s (VB.Vector (VB.Vector (Int, Int)))
+freezePolys mesh =
+  do
+    p <- VB.freeze (polys mesh)
+    return $ VB.map VB.fromList p
 
 {-# INLINE idxVerts #-}
 idxVerts :: MutableMesh s -> Int -> Vec3d

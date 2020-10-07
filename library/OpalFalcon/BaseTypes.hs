@@ -91,7 +91,9 @@ data ParticipatingMaterial
       { participateScatter :: Vec3d -> ColorRGBf,
         participateAbsorb :: Vec3d -> ColorRGBf,
         participatePhase :: PhaseFunc,
-        participateExit :: Ray -> Vec3d -- Returns the position that the Ray would exit the medium.  Ray is guaranteed to be inside the geometry as defined by this function. TODO: This would be good to error handle
+        -- Returns the importance-sampled out direction provided in an direction
+        -- participateImportance :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m Vec3d),
+        participateExit :: Ray -> Maybe Vec3d -- Returns the position that the Ray would exit the medium.  Due to advancing ray by small 'epsilon', it may not still be in the material
       }
 
 -- A function that maps a position in space with a power scale for lighting
