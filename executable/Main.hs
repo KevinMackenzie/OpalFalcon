@@ -8,6 +8,8 @@ module Main where
 import Control.Monad.Random
 import qualified Data.Array as A
 import qualified Data.Vector as VB
+import qualified Data.Vector as VB
+import qualified Data.Vector.Storable as VS
 import Debug.Trace
 import OpalFalcon.BaseTypes
 import OpalFalcon.Images
@@ -18,13 +20,11 @@ import qualified OpalFalcon.Math.MMesh as MM
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import qualified OpalFalcon.Math.TriMesh as TMesh
-import qualified Data.Vector.Storable as VS
-import qualified Data.Vector as VB
 import OpalFalcon.Math.Vector
 import OpalFalcon.Photon.Photon
 import OpalFalcon.Photon.PhotonTracer
 import OpalFalcon.Photon.Visualizer
-import OpalFalcon.Scene
+import qualified OpalFalcon.Scene as Scene
 import OpalFalcon.Scene.Camera
 import OpalFalcon.Scene.ObjectCollections.ObjectList
 import OpalFalcon.Scene.Objects
@@ -33,6 +33,7 @@ import OpalFalcon.Scene.Objects.Plane
 import OpalFalcon.Scene.Objects.PointLight
 import OpalFalcon.Scene.Objects.Sphere
 import OpalFalcon.Scene.Objects.Triangle
+import qualified OpalFalcon.Util.Misc as Misc
 import OpalFalcon.Util.Random
 import OpalFalcon.VolumeMaterial
 -- import OpalFalcon.XTracing.PathTracer
@@ -44,143 +45,10 @@ import System.Directory
 import System.Environment
 import System.Process
 import System.Random
+import qualified TestScene as TS
 
-mesh0 =
-  TMesh.new
-    ( VS.fromList
-        [ V3 1 (-1.99) (-1), -- back bottom left 0
-          V3 1.99 (-1.99) (-1), -- back bottom right 1
-          V3 1.99 (-1.99) 1, -- front bottom right 2
-          V3 1 (-1.99) 1, -- front bottom left 3
-          V3 1 (-0.7) (-1), -- back top left 4
-          V3 1.99 (-0.7) (-1), -- back top right 5
-          V3 1.99 (-0.7) 1, -- front top rigth 6
-          V3 1 (-0.7) 1, -- front top left 7
-          V3 1 (-0.5) (-0.7), -- Ridges 8
-          V3 1 (-0.7) (-0.4), -- 9
-          V3 1 (-0.5) (-0.1), -- 10
-          V3 1 (-0.7) 0.2, -- 11
-          V3 1 (-0.5) 0.5, -- 12
-          V3 1 (-0.7) 0.8, -- 13
-          V3 1 (-0.5) 1.0, -- 14
-          V3 1.99 (-0.7) (-0.7), -- 15
-          V3 1.99 (-0.7) (-0.4), -- 16
-          V3 1.99 (-0.7) (-0.1), -- 17
-          V3 1.99 (-0.7) 0.2, -- 18
-          V3 1.99 (-0.7) 0.5, -- 19
-          V3 1.99 (-0.7) 0.8 -- 20
-        ]
-    )
-    ( VB.fromList
-        [ MM.mkTri 0 2 1, -- Bottom tri 0
-          MM.mkTri 0 3 2, -- Bottom tri 1
-          MM.mkTri 7 3 2, -- Front tri 0
-          MM.mkTri 7 2 6, -- Front tri 1
-          MM.mkTri 6 2 1, -- Right tri 0
-          MM.mkTri 6 1 5, -- Right tri 1
-          MM.mkTri 5 1 0, -- Back tri 0
-          MM.mkTri 5 0 4, -- Back tri 1
-          MM.mkTri 4 0 3, -- Left tri 0
-          MM.mkTri 4 3 7, -- Left tri 1
-          MM.mkTri 4 9 8, -- Ridge tri 0
-          MM.mkTri 9 11 10, -- Ridge Tri 1
-          MM.mkTri 11 13 12, -- Ridge Tri 2
-          MM.mkTri 13 7 14, -- Ridge Tri 3
-          MM.mkTri 7 6 14, -- Front tri 3
-          MM.mkTri 14 6 13, -- Top Ridge 0 0
-          MM.mkTri 13 6 20, -- Top Ridge 0 1
-          MM.mkTri 13 20 12, -- Top Ridge 1 0
-          MM.mkTri 12 20 19, -- Top Ridge 1 1
-          MM.mkTri 12 19 11, -- Top Ridge 2 0
-          MM.mkTri 11 19 18, -- Top Ridge 2 1
-          MM.mkTri 11 18 10, -- Top Ridge 3 1
-          MM.mkTri 10 18 17, -- Top Ridge 3 1
-          MM.mkTri 10 17 9, -- Top Ridge 4 1
-          MM.mkTri 9 17 16, -- Top Ridge 4 1
-          MM.mkTri 9 16 8, -- Top Ridge 5 1
-          MM.mkTri 8 16 15, -- Top Ridge 5 1
-          MM.mkTri 8 15 4, -- Top Ridge 6 1
-          MM.mkTri 4 15 5 -- Top Ridge 6 1
-        ]
-    )
-
-mkQuadPrism pos xDir yDir zDir (V3 sx sy sz) mat =
-  let pts@[lbb, lbf, ltb, ltf, rbb, rbf, rtb, rtf] =
-        [ (pos |+| (xDir |* x) |+| (yDir |* y) |+| (zDir |* z))
-          | x <- [- sx, sx],
-            y <- [- sy, sy],
-            z <- [- sz, sz]
-        ]
-      triples = [(lbb, lbf, ltb), (lbf, ltf, ltb), (ltf, lbf, rbf), (ltf, rbf, rtf), (rtf, rbf, rbb), (rtf, rbb, rtb), (rtb, rbb, lbb), (rtb, lbb, ltb), (ltf, rtf, rtb), (ltf, rtb, ltb), (lbf, rbb, rbf), (lbf, lbb, rbb)]
-   in map (\(a, b, c) -> mkTriangleObject (MkTriangle a b c) mat) triples
-
-emptyScene :: Scene ObjectList
-emptyScene = MkScene
-  { objects = MkObjList {objList = []},
-    lightSources = []
-  }
-
--- The Cornell Box
-cornellBox :: Scene ObjectList
-cornellBox = MkScene
-  { objects = MkObjList
-      { objList = [left0, left1, right0, right1, top0, top1, bottom0, bottom1, back0, back1, light0, light1, mesh]
-      },
-    lightSources =
-      [ --mkDiscLight (MkDisc dPlane 0.75) whitef 25
-        mkTriangleLight light0Tri whitef 25,
-        mkTriangleLight light1Tri whitef 25
-      ]
-  }
-  where
-    vlbf = V3 (-2) (-2) 2
-    vlbb = V3 (-2) (-2) (-2)
-    vltf = V3 (-2) 2 2
-    vltb = V3 (-2) 2 (-2)
-    vrbf = V3 2 (-2) 2
-    vrbb = V3 2 (-2) (-2)
-    vrtf = V3 2 2 2
-    vrtb = V3 2 2 (-2)
-    llf = V3 (-0.5) 1.999 0.5
-    llb = V3 (-0.5) 1.999 (-0.5)
-    lrf = V3 0.5 1.999 0.5
-    lrb = V3 0.5 1.999 (-0.5)
-    diffT d t _ = mkDiffuseMat d (normalize $ triangleNorm t)
-    diffM d = (\m idx _ -> mkDiffuseMat d (TMesh.triNorm m idx))
-    leftMat = diffT (V3 1 0 0)
-    rightMat = diffT (V3 0 0 1)
-    greenMat = diffT (V3 0 1 0)
-    blankMat = diffT (V3 0.84 0.84 0.84)
-    lightMat = diffT (V3 0 0 0)
-    reflMat d t _ = mkSpecularMat d (normalize $ triangleNorm t)
-    boxMat = reflMat (V3 0.7 0.7 1)
-    left0 = mkTriangleObject (MkTriangle vlbf vlbb vltb) leftMat
-    left1 = mkTriangleObject (MkTriangle vlbf vltb vltf) leftMat
-    right0 = mkTriangleObject (MkTriangle vrbf vrtb vrbb) rightMat
-    right1 = mkTriangleObject (MkTriangle vrbf vrtf vrtb) rightMat
-    top0 = mkTriangleObject (MkTriangle vrtf vltf vltb) blankMat
-    top1 = mkTriangleObject (MkTriangle vrtf vltb vrtb) blankMat
-    bottom0 = mkTriangleObject (MkTriangle vrbf vrbb vlbb) blankMat
-    bottom1 = mkTriangleObject (MkTriangle vrbf vlbb vlbf) blankMat
-    back0 = mkTriangleObject (MkTriangle vrtb vltb vlbb) greenMat
-    back1 = mkTriangleObject (MkTriangle vrtb vlbb vrbb) greenMat
-    light0Tri = MkTriangle lrb lrf llf
-    light1Tri = MkTriangle llf llb lrb
-    light0 = mkTriangleObject light0Tri lightMat
-    light1 = mkTriangleObject light1Tri lightMat
-    mesh = mkTriMeshObject mesh0 (diffM $ gray 0.3) -- (pMeshMat (\_ -> constVec 0.2) (\_ -> constVec 1.0) (PhaseFunc (\_ _ -> whitef |/ (4 * pi))))
-    sphre = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (sphereMat (V3 0.9 0.9 0.6))
-    pSphere = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (pSphereMat (\_ -> constVec 0.2) (\_ -> constVec 1.0) (PhaseFunc (\_ _ -> whitef |/ (4 * pi))))
-    qp0 = mkQuadPrism (V3 (-0.5) (-1) (-0.6)) (normalize $ V3 3 0 (-1)) yAxis (normalize $ V3 1 0 3) (V3 0.5 1 0.5) boxMat
-    qp1 = mkQuadPrism (V3 1 (-1.5) 1) (normalize $ V3 3 0 1) yAxis (normalize $ V3 (-1) 0 3) (V3 0.75 0.5 0.75) blankMat
-
-pSphereMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> Sphere -> Vec3d -> AppliedMaterial
-pSphereMat absorb scatter phase s hp = mkVolumeMat (ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = exitSphere s}) hp
-
-pMeshMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> TMesh.TriMesh -> Int -> Vec3d -> AppliedMaterial
-pMeshMat absorb scatter phase mesh idx bc = mkVolumeMat (ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = TMesh.exit mesh}) (TMesh.baryToWorld mesh idx bc)
-
-sphereMat refl (MkSphere s _) hp = mkSpecularMat refl (normalize (hp |-| (affineTranslate s)))
+sceneToRender :: Scene.Scene ObjectList
+sceneToRender = TS.testScene0
 
 printHits hs =
   foldl (++) "\n" $
@@ -190,30 +58,6 @@ printHits hs =
           Just h -> show h
       )
       hs
-
-repeatMF :: (Monad m) => Integer -> m a -> m [a]
-repeatMF 0 f = return []
-repeatMF c f = do
-  v <- f
-  (v :) <$> (repeatMF (c -1) f)
-
-areaPhotonShoot :: (Monad m, RandomGen g, ObjectCollection o) => Scene o -> ColorRGBf -> Int -> Vec3d -> Vec3d -> Vec3d -> Int -> RandT g m ([Photon], [Photon])
-areaPhotonShoot sc pow cnt pos x2 y2 minBounce =
-  let norm = normalize $ x2 |><| y2
-   in do
-        dirs <- repeatMF (toInteger cnt) $ cosWeightedDir norm
-        xs <- (fmap (\a -> (2 * a -1) *| x2)) <$> getRandoms
-        ys <- (fmap (\a -> (2 * a -1) *| y2)) <$> getRandoms
-        (\(a, b) -> (concat a, concat b)) <$> unzip <$> (mapM (\((d, x, y) :: (Vec3d, Vec3d, Vec3d)) -> shootPhoton minBounce sc (EPhoton (Ray (pos |+| x |+| y) d) (pow |/ (fromIntegral cnt)))) $ take cnt $ zip3 dirs xs ys)
-
-globalCam = Camera
-  { cameraPos = V3 (-1.75) 1 5,
-  -- The 'x-dir' of this needs to be flipped for some reason
-    cameraDir = normalize $ V3 (-0.5) (-0.4) (-1),
-    cameraUp = V3 0 1 0,
-    cameraFOV = 75,
-    cameraAspect = 1
-  }
 
 launchWorker :: (Show a) => String -> Int -> [a] -> IO ProcessHandle
 launchWorker bin wid xs =
@@ -264,20 +108,20 @@ mpMap n f_out f_in l =
         pids <- mapM (\(n, g) -> (f_out n g) >>= (\x -> return (n, x))) groups
         unstripeLists <$> (mapM (\(n, p) -> f_in n p) pids)
 
-traceRays_ :: ObjectCollection o => RayTracer -> Scene o -> [(Integer, Ray)] -> IO [ColorRGBf]
+traceRays_ :: Scene.ObjectCollection o => RayTracer -> Scene.Scene o -> [(Integer, Ray)] -> IO [ColorRGBf]
 traceRays_ rt sc = mapM (\x -> traceRay rt sc x)
 
 runMaster :: [String] -> IO ()
 runMaster (workerBin : (numProcsStr : (hstr : (outFile : _)))) =
   let incand = (V3 255 214 170)
-      wht = constVec 255
-      lightPow = ((50 / 255) *| wht)
+      lightPow = (50 *| whitef)
       h = read hstr
       w = h
-      rays = zip [1 ..] $ genRays globalCam h
+      rays = zip [1 ..] $ genRays (Scene.sceneCamera sceneToRender) h
       numProcs = read numProcsStr
    in do
-        (sPhs, vPhs) <- evalRandIO $ areaPhotonShoot cornellBox lightPow 10000000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5) 1 -- only indirect lighting
+        -- (sPhs, vPhs) <- evalRandIO $ areaPhotonShoot cornellBox lightPow 100000 (V3 0 1.998 0) (V3 0.5 0 0) (V3 0 0 0.5) 1 -- only indirect lighting
+        (sPhs, vPhs) <- evalRandIO $ shootPhotons 1 sceneToRender
         pixs <-
           if numProcs == 1
             then workerMain sPhs vPhs rays
@@ -299,7 +143,7 @@ workerMain sPhs vPhs rays =
         { surfaceRadiance = yesglil sPmap,
           volumeRadiance = yesVolGlil vPmap
         }
-   in traceRays_ rt cornellBox rays
+   in traceRays_ rt sceneToRender rays
 
 runWorker :: [String] -> IO ()
 runWorker (wid : _) =

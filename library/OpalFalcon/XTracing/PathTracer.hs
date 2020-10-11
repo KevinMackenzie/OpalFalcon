@@ -32,7 +32,7 @@ pathTraceScene pt sc height cam =
         | otherwise = (shootRay' ray path)
       -- Does the path-tracing using the photon map; may be other versions later
       shootRay' ray@(Ray _ rDir) path =
-        case probeCollection (objects sc) ray of
+        case probeCollection (sceneObjects sc) ray of
           Nothing -> return $ V3 0 1 0 -- Background color
           Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
             let iDir = negateVec $ normalize hDir

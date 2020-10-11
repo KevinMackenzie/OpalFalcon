@@ -1,4 +1,9 @@
-module OpalFalcon.Photon.PhotonTracer (EmissivePhoton (..), shootPhoton) where
+module OpalFalcon.Photon.PhotonTracer
+  ( EmissivePhoton (..),
+    shootPhoton,
+    shootPhotons,
+  )
+where
 
 import Control.Monad.Random
 import Debug.Trace
@@ -7,7 +12,6 @@ import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
 import OpalFalcon.Photon.Photon
 import OpalFalcon.Scene
-import System.Random
 
 ptEpsilon = 0.00001
 
@@ -15,7 +19,7 @@ ptEpsilon = 0.00001
 shootPhoton :: (Monad m, RandomGen g, ObjectCollection o) => Int -> Scene o -> EmissivePhoton -> RandT g m ([Photon], [Photon])
 shootPhoton minBounces scene photon =
   let shoot depth ph@(EPhoton epr _) =
-        case probeCollection (objects scene) epr of
+        case probeCollection (sceneObjects scene) epr of
           Nothing -> return ([], [])
           Just h -> bounce depth ph h
       bounce depth (EPhoton (Ray _ prDir) pCol) MkHit {hitPos = hPos, hitMat = m, hitNorm = norm} =
@@ -46,3 +50,17 @@ shootPhoton minBounces scene photon =
                         -- Also remember to scale the emitted photon
                         Just (EPhoton r pow) -> (\(a, b) -> (a, volPhotons ++ b)) <$> next (EPhoton r (pow |*| pCol))
    in shoot 0 photon
+
+-- TODO: This shoots a fixed number of photons per object, but we should
+--  be targeting a total number of photons
+shootPhotons :: (Monad m, RandomGen g, ObjectCollection c) => Int -> Scene c -> RandT g m ([Photon], [Photon])
+shootPhotons minBounces scene =
+  let emitters = lightSources scene
+   in do
+        photons <-
+          mapM
+            ( \x ->
+                emitPhotons x 50000 >>= (mapM (shootPhoton minBounces scene))
+            )
+            emitters
+        return $ (\(a, b) -> (concat a, concat b)) $ unzip $ concat photons

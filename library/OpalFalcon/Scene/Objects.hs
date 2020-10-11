@@ -2,6 +2,7 @@ module OpalFalcon.Scene.Objects where
 
 import OpalFalcon.BaseTypes as Bt
 import OpalFalcon.Math.Transformations
+import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
 import OpalFalcon.Scene.Objects.Disc as D
 import OpalFalcon.Scene.Objects.DiscLight as DL
@@ -10,7 +11,6 @@ import OpalFalcon.Scene.Objects.PointLight as PL
 import OpalFalcon.Scene.Objects.Sphere as S
 import OpalFalcon.Scene.Objects.TriLight as TL
 import OpalFalcon.Scene.Objects.Triangle as T
-import qualified OpalFalcon.Math.TriMesh as TMesh
 
 -- TODO: this is not straightforward.  Make constructors from objects and their materials.  The separation is so we can have the same objects rendered with different materials so real-time interface can use simple materials?  Or maybe we can just use the 'diffuse' component of the material?
 
@@ -19,45 +19,63 @@ mkSphereObject :: Sphere -> SphereMat -> Bt.Object
 mkSphereObject sphere@(MkSphere space _) mat =
   Bt.MkObj
     { objPos = spacePos space,
-      objIntersectRay = S.hittestSphere sphere mat
+      objIntersectRay = S.hittestSphere sphere mat,
+      objLightSource = Nothing
     }
 
 mkPlaneObject :: Plane -> PlaneMat -> Bt.Object
 mkPlaneObject plane@(MkPlane space) mat =
   Bt.MkObj
     { objPos = spacePos space,
-      objIntersectRay = P.hittestPlaneFront plane mat
+      objIntersectRay = P.hittestPlaneFront plane mat,
+      objLightSource = Nothing
     }
 
 mkDiscObject :: Disc -> DiscMat -> Bt.Object
 mkDiscObject disc@(MkDisc (MkPlane space) _) mat =
   Bt.MkObj
     { objPos = spacePos space,
-      objIntersectRay = D.hittestDisc disc mat
+      objIntersectRay = D.hittestDisc disc mat,
+      objLightSource = Nothing
     }
 
 mkTriangleObject :: Triangle -> TriangleMat -> Bt.Object
 mkTriangleObject triangle mat =
   Bt.MkObj
     { objPos = T.trianglePos triangle,
-      objIntersectRay = T.hittestTriangleFront triangle mat
+      objIntersectRay = T.hittestTriangleFront triangle mat,
+      objLightSource = Nothing
+    }
+
+mkTriangleObjectFull :: Triangle -> TriangleMat -> ColorRGBf -> Float -> Bt.Object
+mkTriangleObjectFull t mat col pow =
+  Bt.MkObj
+    { objPos = T.trianglePos t,
+      objIntersectRay = T.hittestTriangleFront t mat,
+      objLightSource = Just $ MkLight
+        { lightSample = TL.sampleTriLight 20 (TL.MkTL t col pow),
+          emitPhotons = TL.emitTriPhotons (TL.MkTL t col pow)
+        }
     }
 
 mkTriMeshObject :: TMesh.TriMesh -> TMesh.TriMeshMat -> Bt.Object
 mkTriMeshObject mesh mat =
   Bt.MkObj
     { objPos = origin, -- TODO
-      objIntersectRay = TMesh.hittestTriMeshOutside mesh mat
+      objIntersectRay = TMesh.hittestTriMeshOutside mesh mat,
+      objLightSource = Nothing
     }
 
 mkDiscLight :: D.Disc -> ColorRGBf -> Float -> LightSource
 mkDiscLight d c p =
-  MkLight {lightSample = DL.sampleDiscLight 10 (DL.MkDL d c p)}
+  MkLight
+    { lightSample = DL.sampleDiscLight 10 (DL.MkDL d c p),
+      emitPhotons = undefined
+    }
 
 mkPointLight :: Vec3d -> ColorRGBf -> Float -> LightSource
 mkPointLight p c d =
-  MkLight {lightSample = PL.samplePointLight (PL.MkPL p c d)}
-
-mkTriangleLight :: Triangle -> ColorRGBf -> Float -> LightSource
-mkTriangleLight t c p =
-  MkLight {lightSample = TL.sampleTriLight 20 (TL.MkTL t c p)}
+  MkLight
+    { lightSample = PL.samplePointLight (PL.MkPL p c d),
+      emitPhotons = undefined
+    }

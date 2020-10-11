@@ -18,7 +18,7 @@ sRGBToLinear x = if x <= 0.04045 then x/12.92 else ((x+sRGBAlpha)/(1+sRGBAlpha))
 saveToPngRtr :: String -> [ColorRGBf] -> Int -> Int -> IO ()
 saveToPngRtr p l w h = 
     let pixs = V.fromList $ map (((\(V3 x y z) -> PixelRGB8 x y z) . toPixel) :: (ColorRGBf -> PixelRGB8)) l
-        bs = encodePng $ generateImage (\x y -> pixs V.! ((h-1-y)+(w-1-x)*h)) w h
+        bs = encodePng $ generateImage (\x y -> pixs V.! ((h-1-y)+x*h)) w h
     in do Bs.writeFile p bs
 
 

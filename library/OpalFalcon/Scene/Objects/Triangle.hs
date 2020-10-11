@@ -9,11 +9,13 @@ module OpalFalcon.Scene.Objects.Triangle
     pointInTriangle,
     intersectTriangle,
     insideTriPlane,
+    randTriPt,
   )
 where
 
--- TODO: Most of this can be moved into "math" and only the hit-construction can stay here
+-- TODO: Most of this can be moved into "geometry" and only the hit-construction can stay here
 
+import Control.Monad.Random
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
@@ -28,13 +30,18 @@ data Triangle = MkTriangle !Vec3d !Vec3d !Vec3d
 trianglePos :: Triangle -> Vec3d
 trianglePos (MkTriangle v0 v1 v2) = (v0 |+| v1 |+| v2) |/ 3
 
+-- Gets the normalized triangle surface normal
 triangleNorm :: Triangle -> Vec3d
-triangleNorm (MkTriangle v0 v1 v2) = (v1 |-| v0) |><| (v2 |-| v0)
+triangleNorm = normalize . triangleNorm_
+
+-- Gets the non-normalized triangle surface normal
+triangleNorm_ :: Triangle -> Vec3d
+triangleNorm_ (MkTriangle v0 v1 v2) = (v1 |-| v0) |><| (v2 |-| v0)
 
 -- Hittest that ignores backface hits
 hittestTriangleFront :: Triangle -> TriangleMat -> Ray -> Maybe Hit
 hittestTriangleFront t mat r@(Ray _ rDir) =
-  if ((triangleNorm t) |.| rDir) >= 0
+  if ((triangleNorm_ t) |.| rDir) >= 0
     then Nothing
     else hittestTriangle t mat r
 
@@ -45,7 +52,7 @@ hittestTriangleBack (MkTriangle v0 v1 v2) mat r =
 
 intersectTriangle :: Triangle -> Ray -> Maybe (Double, Vec3d, Vec3d)
 intersectTriangle t@(MkTriangle v0 v1 v2) r@(Ray rPos rDir) =
-  let n' = triangleNorm t
+  let n' = triangleNorm_ t
       n = normalize n'
       a2 = mag n' -- cross product is the double-area
       d = n |.| v0 -- the constant offset of the implicit plane function
@@ -91,3 +98,14 @@ pointInTriangle (MkTriangle p0 p1 p2) pt =
 insideTriPlane :: Triangle -> Vec3d -> Bool
 insideTriPlane tri@(MkTriangle p0 _ _) pt =
   (triangleNorm tri) |.| (pt |-| p0) <= 0
+
+-- Credit: Shape Distributions, ACM ToG Vol 21. No4, Oct 2002 p814
+--  (https://www.cs.princeton.edu/~funk/tog02.pdf)
+{-# INLINE randTriPt #-}
+randTriPt :: (Monad m, RandomGen g) => Triangle -> RandT g m Vec3d
+randTriPt (MkTriangle p0 p1 p2) =
+  do
+    r1 <- getRandom
+    r2 <- getRandom
+    let sr1 = sqrt r1
+     in return $ ((1 - sr1) *| p0) |+| ((sr1 * (1 - r2)) *| p1) |+| ((sr1 * r1) *| p2)

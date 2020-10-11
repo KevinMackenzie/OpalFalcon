@@ -77,7 +77,7 @@ participateMedia rt sc (ParticipatingMaterial {participateAbsorb = absorb, parti
         return $ attenuateMedium samplePos prevRad $ distance samplePos prevPos
       filterSample sPos (LightSample lPos _ _) =
         let fromLightDir = normalize $ sPos |-| lPos
-         in case probeCollection (objects sc) (Ray lPos $ fromLightDir) of
+         in case probeCollection (sceneObjects sc) (Ray lPos $ fromLightDir) of
               Nothing -> True
               Just h -> case (probeInside (Ray sPos $ negateVec fromLightDir)) of
                 Nothing -> False -- Thin geometry
@@ -105,7 +105,7 @@ participateMedia rt sc (ParticipatingMaterial {participateAbsorb = absorb, parti
 directIllum :: (Monad m, RandomGen g, ObjectCollection o) => Scene o -> Vec3d -> Vec3d -> Vec3d -> Bssrdf -> RandT g m ColorRGBf
 directIllum scene pos rInDir norm (Bssrdf bssrdf) =
   let filterSample (LightSample lPos _ _) =
-        case probeCollection (objects scene) (Ray lPos $ normalize $ pos |-| lPos) of
+        case probeCollection (sceneObjects scene) (Ray lPos $ normalize $ pos |-| lPos) of
           Nothing -> True
           Just h -> (hitPos h) ~= pos
    in do
@@ -127,7 +127,7 @@ traceRay rt sc ray =
         | numBounces path > 5 = return $ V3 1 0 0 -- Too many bounces
         | otherwise = (shootRay' ray path)
       shootRay' ray@(Ray _ rDir) path =
-        case probeCollection (objects sc) ray of
+        case probeCollection (sceneObjects sc) ray of
           Nothing -> return $ V3 0 1 0 -- Background color
           Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
             let iDir = negateVec $ normalize hDir

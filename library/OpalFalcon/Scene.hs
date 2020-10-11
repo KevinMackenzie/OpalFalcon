@@ -1,6 +1,7 @@
 module OpalFalcon.Scene
-  ( ObjectCollection (probeCollection),
-    Scene (MkScene, objects, lightSources),
+  ( ObjectCollection (..),
+    Scene (..),
+    lightSources,
     sampleLights,
   )
 where
@@ -8,15 +9,22 @@ where
 import Control.Monad.Random
 import qualified OpalFalcon.BaseTypes as Bt
 import qualified OpalFalcon.Math.Ray as R
+import OpalFalcon.Scene.Camera (Camera)
 
 class ObjectCollection c where
+
   probeCollection :: c -> R.Ray -> Maybe Bt.Hit
+
+  collectionLightSources :: c -> [Bt.LightSource]
 
 data Scene o
   = MkScene
-      { objects :: o,
-        lightSources :: [Bt.LightSource]
+      { sceneObjects :: o,
+        sceneCamera :: Camera
       }
+
+lightSources :: (ObjectCollection c) => Scene c -> [Bt.LightSource]
+lightSources = collectionLightSources . sceneObjects
 
 -- Samples all lights in the scene and returns a list of all samples that
 --  are not occluded by other objects in the scene

@@ -45,7 +45,8 @@ instance Show Hit where
 data Object
   = MkObj
       { objPos :: Vec3d,
-        objIntersectRay :: Ray -> Maybe Hit
+        objIntersectRay :: Ray -> Maybe Hit,
+        objLightSource :: Maybe LightSource
       }
 
 -- Hit types; eye is implied
@@ -104,13 +105,18 @@ newtype AttenuationFunc = AttenuationFunc (Vec3d -> Float)
 data LightSample = LightSample Vec3d AttenuationFunc ColorRGBf
 
 -- Provides function to sample light source from a point in the scene
---   This is only good for lambertian surfaces, so only BRDF's are supported
 data LightSource
   = MkLight
       { lightSample ::
           ( forall g m.
             (Monad m, RandomGen g) =>
             RandT g m [LightSample]
+          ),
+        emitPhotons ::
+          ( forall g m.
+            (Monad m, RandomGen g) =>
+            Int ->
+            RandT g m [EmissivePhoton]
           )
       }
 

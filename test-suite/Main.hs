@@ -29,6 +29,7 @@ import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
+import qualified OpalFalcon.Util.Misc as Misc
 import qualified OpalFalcon.Photon.Photon as PH
 import qualified OpalFalcon.Photon.STHeap as STH
 import OpalFalcon.Scene.Camera
@@ -78,6 +79,7 @@ main = do
   triangleTests <- testSpec "OpalFalcon.Scene.Objects.Triangle" triangleSpec
   stHeapTests <- testSpec "OpalFalcon.Photon.STHeap" stHeapSpec
   triMeshTests <- testSpec "OpalFalcon.Math.TriMesh" triMeshSpec
+  utilTests <- testSpec "OpalFalcon.Util" utilSpec
   Test.Tasty.defaultMain $
     Test.Tasty.testGroup
       "OpalFalcon"
@@ -90,7 +92,8 @@ main = do
         cameraTests,
         triangleTests,
         stHeapTests,
-        triMeshTests
+        triMeshTests,
+        utilTests
       ]
 
 -- Only test non-trivial operations on vectors
@@ -512,3 +515,17 @@ triMeshSpec =
           merged = TMesh.merge [tm0, tm1]
        in do
             (VB.toList $ TMesh.tris merged) `shouldBe` [MM.mkTri 0 1 2, MM.mkTri 3 4 5]
+
+utilSpec :: Spec
+utilSpec =
+  describe "Util" $ do
+    describe "interleave" $ do
+      it "works" $
+        let l0 = [0, 1, 2, 3]
+            l1 = [4, 5]
+         in do
+              (Misc.interleave l0 l1) `shouldBe` [0, 4, 1, 5, 2, 3]
+              (Misc.interleave l1 l0) `shouldBe` [4, 0, 5, 1, 2, 3]
+              (Misc.interleave [] l0) `shouldBe` l0
+              (Misc.interleave l0 []) `shouldBe` l0
+              (Misc.interleave [] []) `shouldBe` ([] :: [()])
