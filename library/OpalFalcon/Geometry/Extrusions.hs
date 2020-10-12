@@ -1,32 +1,97 @@
 module OpalFalcon.Geometry.Extrusions where
 
+import Control.Monad.Extra (whileM)
+import Control.Monad.ST
+import Data.STRef
 import qualified Data.Vector as VB
 import qualified Data.Vector.Storable as VS
 import qualified OpalFalcon.Math.MMesh as MM
 import qualified OpalFalcon.Math.TriMesh as TMesh
-import qualified OpalFalcon.Scene.Objects.Triangle as T
-import OpalFalcon.Scene.Objects
 import OpalFalcon.Math.Vector
+import OpalFalcon.Scene.Objects
+import qualified OpalFalcon.Scene.Objects.Triangle as T
+import qualified OpalFalcon.Util.MutableList as MList
 
+-- NOTE: does not enforce manifold condition on extruded edges
 -- extrudes a curve in a direction by the length of that vector
 -- The normal will be "up" if 'dir" is forward and pts go right
 extrudeIndexedPolyLine :: VS.Vector Vec3d -> VS.Vector Int -> Vec3d -> (VS.Vector Vec3d, VB.Vector MM.Tri)
-extrudeIndexedPolyLine pts idxs dir = extrudePolyLine (VS.map (pts VS.!) idxs) dir
-
-extrudePolyLine :: VS.Vector Vec3d -> Vec3d -> (VS.Vector Vec3d, VB.Vector MM.Tri)
-extrudePolyLine points dir =
-  let l = VS.length points
-      oppPoints = VS.map (dir |+|) points
+extrudeIndexedPolyLine pts idxs dir =
+  let l = VS.length pts
+      oppPoints = VS.map (dir |+|) pts
       tris =
         concat $
           map
             ( \idx ->
-                [ MM.mkTri idx (idx + 1) (l + idx),
-                  MM.mkTri (idx + 1) (l + idx + 1) (l + idx)
-                ]
+                let idx0 = idxs VS.! idx
+                    idx1 = idxs VS.! (idx + 1)
+                    idx2 = l + idx1
+                    idx3 = l + idx0
+                 in [ MM.mkTri idx1 idx0 idx2,
+                      MM.mkTri idx2 idx0 idx3
+                    ]
             )
-            [0 .. VS.length points -2]
-   in (points VS.++ oppPoints, VB.fromList tris)
+            [0 .. VS.length idxs -2]
+   in (pts VS.++ oppPoints, VB.fromList tris)
+
+-- TODO: to keep the shape closed, need to "share" indexed points
+extrudePolyLine :: VS.Vector Vec3d -> Vec3d -> (VS.Vector Vec3d, VB.Vector MM.Tri)
+extrudePolyLine points dir = extrudeIndexedPolyLine points (VS.fromList [0 .. VS.length points -1]) dir
+
+-- NOTE: assumes the points are coplanar; probably shouldn't
+-- NOTE: Assumes the polygon is convex; probably shouldn't
+-- Extrudes a closed polygon into a solid;  Connects last index to first index
+extrudeIndexedPoly :: VS.Vector Vec3d -> VS.Vector Int -> Vec3d -> (VS.Vector Vec3d, VB.Vector MM.Tri)
+extrudeIndexedPoly points idxs dir =
+  let (points', tris) = extrudeIndexedPolyLine points (VS.snoc idxs $ VS.head idxs) dir
+      frontFaceTris = tesselateIndexedPoly points' idxs (negateVec dir)
+      backFaceIdxs = VS.reverse $ VS.map (VS.length points +) idxs
+      backFaceTris = tesselateIndexedPoly points' backFaceIdxs dir
+   in (points', tris VB.++ frontFaceTris VB.++ backFaceTris)
+
+extrudePoly :: VS.Vector Vec3d -> Vec3d -> (VS.Vector Vec3d, VB.Vector MM.Tri)
+extrudePoly points dir =
+  extrudeIndexedPoly points (VS.fromList $ [0 .. VS.length points -1]) dir
+
+-- NOTE: Assumes the indexs are provided in CCW order
+-- NOTE: Assumes a single polygon with no holes
+-- This is a little algorithm I designed: Runtime: O(n^2)? idk
+--      Initial condition: A closed polygon with points ordered CCW
+--      Invariant: An "inner" polygon with CCW ordering is maintained
+--      Each iteration: exclude a triangular section from the inner polygon
+tesselateIndexedPoly :: VS.Vector Vec3d -> VS.Vector Int -> Vec3d -> VB.Vector MM.Tri
+tesselateIndexedPoly points idxs dir =
+  let excludeTri mesh lRef =
+        do
+          l0 <- readSTRef lRef
+          l1 <- MList.nextRef l0
+          l2 <- MList.nextRef l1
+          idx0 <- MList.readRef l0
+          idx1 <- MList.readRef l1
+          idx2 <- MList.readRef l2
+          let pt0 = points VS.! idx0
+              pt1 = points VS.! idx1
+              pt2 = points VS.! idx2
+           in if (((pt1 |-| pt0) |><| (pt2 |-| pt0)) |.| dir) > 0
+                then do
+                  MM.addTri mesh (MM.mkTri idx0 idx1 idx2)
+                  _ <- MList.erase l1
+                  shouldContinue lRef
+                else do
+                  writeSTRef lRef l1
+                  excludeTri mesh lRef
+      shouldContinue lRef =
+        do
+          l <- readSTRef lRef -- The 'inner' polygon
+          len <- MList.length l -- The mesh of triangles outside polygon
+          return $ len > 3
+   in runST $ do
+        lRef <- (MList.fromList $ VS.toList idxs) >>= newSTRef
+        mesh <- MM.new points
+        whileM (excludeTri mesh lRef)
+        [p0, p1, p2] <- readSTRef lRef >>= MList.toList
+        MM.addTri mesh (MM.mkTri p0 p1 p2)
+        VB.fromList <$> MM.enumerateTris mesh
 
 -- F must be positive and monotone
 -- TODO: This could be improved by lining the bottom with points at the midpoint

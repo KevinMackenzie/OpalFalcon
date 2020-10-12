@@ -29,11 +29,12 @@ import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
-import qualified OpalFalcon.Util.Misc as Misc
 import qualified OpalFalcon.Photon.Photon as PH
 import qualified OpalFalcon.Photon.STHeap as STH
 import OpalFalcon.Scene.Camera
 import qualified OpalFalcon.Scene.Objects.Triangle as OTRI
+import qualified OpalFalcon.Util.Misc as Misc
+import qualified OpalFalcon.Util.MutableList as MList
 import System.Random
 import Test.HUnit.Lang
 import qualified Test.Tasty
@@ -529,3 +530,56 @@ utilSpec =
               (Misc.interleave [] l0) `shouldBe` l0
               (Misc.interleave l0 []) `shouldBe` l0
               (Misc.interleave [] []) `shouldBe` ([] :: [()])
+    describe "MList" $ do
+      it "fromList" $ do
+        let l0 = [0, 1, 2, 3]
+            (l1, len) = runST $
+              do
+                l <- MList.fromList l0
+                l' <- MList.toList l
+                len <- MList.length l
+                return (l', len)
+         in do
+              l1 `shouldBe` l0
+              len `shouldBe` 4
+      it "inserts" $ do
+        let l0 = [0, 1, 2, 3]
+            l1 = runST $
+              do
+                l <- MList.fromList l0
+                MList.insertBefore l 8
+                MList.insertAfter l 9
+                MList.toList l
+            l2 = runST $
+              do
+                l <- MList.new
+                MList.insertAfter l 1
+                MList.toList l
+            l3 = runST $
+              do
+                l <- MList.new
+                MList.insertBefore l 1
+                MList.toList l
+         in do
+              l1 `shouldBe` [0, 9, 1, 2, 3, 8]
+              l2 `shouldBe` [1]
+              l3 `shouldBe` [1]
+      it "erases" $ do
+        let l0 = [0, 1, 2, 3]
+            (l1, v, v2) = runST $
+              do
+                l <- MList.fromList l0
+                (v, l) <- MList.erase l
+                v2 <- MList.readRef l
+                l1 <- MList.toList l
+                return (l1, v, v2)
+            l2 = runST $
+              do
+                l <- MList.singleton 0
+                (_,l) <- MList.erase l
+                MList.toList l
+         in do
+              v `shouldBe` 0
+              v2 `shouldBe` 1
+              l1 `shouldBe` [1, 2, 3]
+              l2 `shouldBe` []

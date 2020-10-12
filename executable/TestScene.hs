@@ -6,6 +6,7 @@ import qualified Data.Vector as VB
 import qualified Data.Vector.Storable as VS
 import Debug.Trace
 import OpalFalcon.BaseTypes
+import qualified OpalFalcon.Geometry.Curves as Curves
 import qualified OpalFalcon.Geometry.Extrusions as Ext
 import OpalFalcon.Images
 import qualified OpalFalcon.KdTree as Kd
@@ -117,10 +118,10 @@ ground =
   mkTriMeshObject
     ( uncurry TMesh.new $
         genQuad
-          (V3 (-10) (-2) 10)
-          (V3 10 (-2) 10)
-          (V3 10 (-2) (-10))
-          (V3 (-10) (-2) (-10))
+          (V3 (-10) 0 10)
+          (V3 10 0 10)
+          (V3 10 0 (-10))
+          (V3 (-10) 0 (-10))
     )
     (dMeshMat $ V3 0.8 0.8 0.8)
 
@@ -128,72 +129,62 @@ ground =
 testScene0 :: Scene ObjectList
 testScene0 = MkScene
   { sceneObjects = MkObjList
-      { objList = [ground, groomed, boundaryLeft, boundaryRight] ++ sceneLights
+      { objList = [solid] ++ sceneLights
       },
     sceneCamera = getCamera
   }
   where
     boundaryFunc x = - x + 0.3636 * x + 0.4
+    -- TODO: Make this one polyline and extrude it all at once to get one solid volume
     boundaryLeft = genLeftBank boundaryFunc 1
     boundaryRight = genRightBank boundaryFunc 1
-    groomed =
+    groomed = VS.fromList $ [V3 (- sceneMidWidth / 2) 0 0, V3 (sceneMidWidth / 2) 0 0]
+    bottomLeft = VS.fromList $ [V3 (- sceneMidWidth / 2 - sceneBankWidth) (-1) 0]
+    bottomRight = VS.fromList $ [V3 (sceneMidWidth / 2 + sceneBankWidth) (-1) 0]
+    line = VS.reverse $ VS.concat [bottomLeft, boundaryLeft, groomed, boundaryRight, bottomRight]
+    solid =
       mkTriMeshObject
-        ( uncurry TMesh.new $
-            genQuad
-              (V3 (- sceneMidWidth / 2) 0 0)
-              (V3 (sceneMidWidth / 2) 0 0)
-              (V3 (sceneMidWidth / 2) 0 (-sceneLength))
-              (V3 (- sceneMidWidth / 2) 0 (-sceneLength))
-        )
+        (uncurry TMesh.new $ Ext.extrudePoly line (V3 0 0 (- sceneLength)))
         (dMeshMat $ V3 0.8 0.7 0.7)
 
-genRightBank :: (Double -> Double) -> Int -> Object
-genRightBank boundaryFunc subdiv =
-  mkTriMeshObject
-    ( Ext.genPathBoundary
-        (V3 (sceneMidWidth / 2) 0 0)
-        (V3 0 0 (- sceneLength))
-        (V3 sceneBankWidth 0 0)
-        boundaryFunc
-        subdiv
-    )
-    (dMeshMat $ V3 0.5 0.6 0.5)
+genBank :: (Double -> Double) -> Int -> VS.Vector Vec3d
+genBank boundaryFunc subdiv =
+  let points = Curves.linearInterpolant boundaryFunc (0, sceneBankWidth) subdiv
+   in VS.fromList $ map (\(x, y) -> V3 x y 0) points
 
-genLeftBank :: (Double -> Double) -> Int -> Object
+genRightBank :: (Double -> Double) -> Int -> VS.Vector Vec3d
+genRightBank boundaryFunc subdiv =
+  let bank = genBank boundaryFunc subdiv
+   in VS.map (|+| (V3 (sceneMidWidth / 2) 0 0)) bank
+
+genLeftBank :: (Double -> Double) -> Int -> VS.Vector Vec3d
 genLeftBank boundaryFunc subdiv =
-  mkTriMeshObject
-    ( Ext.genPathBoundary
-        (V3 (- sceneMidWidth / 2) 0 (- sceneLength))
-        (V3 0 0 sceneLength)
-        (V3 (- sceneBankWidth) 0 0)
-        boundaryFunc
-        subdiv
-    )
-    (dMeshMat $ V3 0.5 0.5 0.6)
+  let bank = genBank boundaryFunc subdiv
+   in VS.map (\(V3 x y z) -> V3 (- x - sceneMidWidth / 2) y z) $ VS.reverse bank
 
 -- The full complexity test scene (subject to change)
-getTestScene0 :: Scene ObjectList
-getTestScene0 = MkScene
-  { sceneObjects = MkObjList
-      { objList = [ground, groomed, boundaryLeft, boundaryRight] ++ sceneLights
-      },
-    sceneCamera = getCamera
-  }
-  where
-    planeMat d (MkPlane (V4 x y z _)) pos = mkDiffuseMat d (normalize $ (fromHomoDir x) |><| (fromHomoDir y))
-    groomed =
-      mkTriMeshObject
-        ( genGroomedSurface
-            (V3 (- sceneMidWidth / 2) 0 0)
-            (V3 0 0 (- sceneLength))
-            (V3 sceneMidWidth 0 0)
-            0.0381
-            0.0254
-        )
-        (dMeshMat $ V3 0.8 0.7 0.7)
-    boundaryFunc x = 0.4 * (1 / (10 * x + 1))
-    boundaryLeft = genLeftBank boundaryFunc 10
-    boundaryRight = genRightBank boundaryFunc 10
+-- getTestScene0 :: Scene ObjectList
+-- getTestScene0 = MkScene
+--   { sceneObjects = MkObjList
+--       { objList = [ground, groomed, boundaryLeft, boundaryRight] ++ sceneLights
+--       },
+--     sceneCamera = getCamera
+--   }
+--   where
+--     planeMat d (MkPlane (V4 x y z _)) pos = mkDiffuseMat d (normalize $ (fromHomoDir x) |><| (fromHomoDir y))
+--     groomed =
+--       mkTriMeshObject
+--         ( genGroomedSurface
+--             (V3 (- sceneMidWidth / 2) 0 0)
+--             (V3 0 0 (- sceneLength))
+--             (V3 sceneMidWidth 0 0)
+--             0.0381
+--             0.0254
+--         )
+--         (dMeshMat $ V3 0.8 0.7 0.7)
+--     boundaryFunc x = 0.4 * (1 / (10 * x + 1))
+--     boundaryLeft = genLeftBank boundaryFunc 10
+--     boundaryRight = genRightBank boundaryFunc 10
 
 pSphereMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> Sphere -> Vec3d -> AppliedMaterial
 pSphereMat absorb scatter phase s hp = mkVolumeMat (ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = exitSphere s}) hp
