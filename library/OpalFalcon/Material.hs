@@ -1,6 +1,7 @@
 module OpalFalcon.Material
   ( mkDiffuseMat,
     mkSpecularMat,
+    triDebugMat,
     mkDiffuseMatSchlick,
     mkSpecularMatSchlick,
   )
@@ -11,6 +12,7 @@ import GHC.Float (double2Float, float2Double)
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Lighting (cosWeightedDir)
 import OpalFalcon.Math.Vector
+import OpalFalcon.Scene.Objects.Triangle
 
 -- Material with purely diffuse reflectivity
 mkDiffuseMat :: ColorRGBf -> Vec3d -> AppliedMaterial
@@ -29,6 +31,10 @@ mkDiffuseMat refl norm =
           transmitPhoton = xmitPhoton,
           surfaceBssrdf = mkBssrdf $ Brdf brdf
         }
+
+triDebugMat :: Triangle -> Vec3d -> AppliedMaterial
+triDebugMat tri bc =
+   mkDiffuseMat (double2FloatVec bc) (triangleNorm tri)
 
 mkDiffuseMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
 mkDiffuseMatSchlick refl norm =

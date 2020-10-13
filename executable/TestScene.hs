@@ -118,10 +118,10 @@ ground =
   mkTriMeshObject
     ( uncurry TMesh.new $
         genQuad
-          (V3 (-10) 0 10)
-          (V3 10 0 10)
-          (V3 10 0 (-10))
-          (V3 (-10) 0 (-10))
+          (V3 (-5) (-1.01) 2)
+          (V3 5 (-1.01) 2)
+          (V3 5 (-1.01) (-5))
+          (V3 (-5) (-1.01) (-5))
     )
     (dMeshMat $ V3 0.8 0.8 0.8)
 
@@ -129,7 +129,7 @@ ground =
 testScene0 :: Scene ObjectList
 testScene0 = MkScene
   { sceneObjects = MkObjList
-      { objList = [solid] ++ sceneLights
+      { objList = [solid, ground] ++ sceneLights
       },
     sceneCamera = getCamera
   }
@@ -145,7 +145,11 @@ testScene0 = MkScene
     solid =
       mkTriMeshObject
         (uncurry TMesh.new $ Ext.extrudePoly line (V3 0 0 (- sceneLength)))
-        (dMeshMat $ V3 0.8 0.7 0.7)
+        ( pMeshMat
+            (\_ -> 0.05 *| whitef)
+            (\_ -> 2.0 *| whitef)
+            (PhaseFunc $ \_ _ -> whitef |/ (4 * pi)) -- (dMeshMat $ V3 0.8 0.7 0.7)
+        )
 
 genBank :: (Double -> Double) -> Int -> VS.Vector Vec3d
 genBank boundaryFunc subdiv =
@@ -197,3 +201,6 @@ dTriMat d t _ = mkDiffuseMat d (triangleNorm t)
 
 dMeshMat :: ColorRGBf -> TMesh.TriMesh -> Int -> Vec3d -> AppliedMaterial
 dMeshMat d m idx _ = mkDiffuseMat d (TMesh.triNorm m idx)
+
+debugMeshMat :: TMesh.TriMesh -> Int -> Vec3d -> AppliedMaterial
+debugMeshMat m idx bc = dMeshMat (double2FloatVec bc) m idx bc

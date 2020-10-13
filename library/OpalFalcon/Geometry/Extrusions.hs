@@ -55,6 +55,8 @@ extrudePoly points dir =
 
 -- NOTE: Assumes the indexs are provided in CCW order
 -- NOTE: Assumes a single polygon with no holes
+-- NOTE: No two adjacent points can be coincident
+-- TODO: This could be extended to higher dimmensions
 -- This is a little algorithm I designed: Runtime: O(n^2)? idk
 --      Initial condition: A closed polygon with points ordered CCW
 --      Invariant: An "inner" polygon with CCW ordering is maintained

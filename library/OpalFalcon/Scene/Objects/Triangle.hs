@@ -21,6 +21,8 @@ import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
 
+import qualified OpalFalcon.Geometry.Triangle as Tri
+
 -- Note: The parameter for triangular materials is in barycentric coords.  I think this lets us interpolate across UV parameters easily for textured triangles
 type TriangleMat = Triangle -> Vec3d -> AppliedMaterial
 

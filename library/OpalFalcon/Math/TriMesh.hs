@@ -22,6 +22,7 @@ import OpalFalcon.Math.Ray
 import OpalFalcon.Math.Vector
 import qualified OpalFalcon.Scene.Objects.Triangle as T
 import OpalFalcon.Util.Misc
+import qualified OpalFalcon.Geometry.Triangle as Tri
 
 -- A closed triangle mesh object
 -- TODO: this assumes, not enforces, the closed mesh property
@@ -100,9 +101,9 @@ indexAsScTri mesh idx =
 
 {-# INLINE baryToWorld #-}
 baryToWorld :: TriMesh -> Int -> Vec3d -> Vec3d
-baryToWorld mesh idx (V3 u v w) =
+baryToWorld mesh idx bc =
   let (a, b, c) = index mesh idx
-   in (u *| a) |+| (v *| b) |+| (w *| c)
+   in Tri.baryToWorld (Tri.Tri a b c) bc
 
 type TriMeshMat = TriMesh -> Int -> Vec3d -> AppliedMaterial
 
