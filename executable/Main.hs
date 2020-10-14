@@ -126,10 +126,25 @@ runMaster (workerBin : (numProcsStr : (hstr : (outFile : _)))) =
           if numProcs == 1
             then workerMain sPhs vPhs rays
             else do
+              -- mtWorkerMain numProcs sPhs vPhs rays
               writeFile "sPmap.bin" (show sPhs)
               writeFile "vPmap.bin" (show vPhs)
               mpMap numProcs (launchWorker workerBin) joinWorker rays
         saveToPngRtr outFile pixs w h
+
+mtWorkerMain threads sPhs vPhs rays =
+  let sPmap = mkPhotonMap sPhs
+      vPmap = mkPhotonMap vPhs
+      gil pmap pcount maxDist pos inc norm bssrdf = estimateRadiance pmap pcount pos inc maxDist bssrdf norm
+      yesglil p = gil p 500 0.5
+      noglil p _ _ _ _ = black
+      volGlil pmap pCount maxDist pos inc phase = estimateVolumeRadiance pmap pCount pos inc maxDist phase
+      yesVolGlil p = volGlil p 500 0.2
+      rt = RayTracer
+        { surfaceRadiance = yesglil sPmap,
+          volumeRadiance = yesVolGlil vPmap
+        }
+   in mtMapM threads (\x -> traceRay rt sceneToRender x) rays
 
 workerMain sPhs vPhs rays =
   let sPmap = mkPhotonMap sPhs

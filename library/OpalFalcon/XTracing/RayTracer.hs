@@ -9,6 +9,7 @@ module OpalFalcon.XTracing.RayTracer
     testParallel,
     testParallel2,
     traceRay,
+    mtMapM,
   )
 where
 
@@ -26,6 +27,7 @@ import OpalFalcon.Math.Vector
 import OpalFalcon.Scene
 import OpalFalcon.Scene.Camera
 import OpalFalcon.Util.Random
+import qualified OpalFalcon.Util.StrictList as SL
 import OpalFalcon.XTracing.RayTraceUtils
 import OpalFalcon.XTracing.XTracer
 import System.Random
@@ -158,9 +160,7 @@ startThreads :: (a -> IO b) -> [a] -> IO [(ThreadId, IO (Thread.Result b))]
 startThreads _ [] = return []
 startThreads f (h : t) =
   do
-    res <- Thread.forkOS $ do
-      v <- f h
-      return v
+    res <- Thread.forkOS $ f h
     tail <- startThreads f t
     return $ res : tail
 
@@ -172,9 +172,9 @@ joinThreads ((tid, resHandle) : t) =
     tail <- joinThreads t
     return $ res : tail
 
-splitList :: Int -> [a] -> [[a]]
+splitList :: Int -> [a] -> [SL.List a]
 splitList n [] = []
-splitList n l = (take n l) : (splitList n $ drop n l)
+splitList n l = (SL.fromList $ take n l) : (splitList n $ drop n l)
 
 -- Eval each ray in the IO monad because the ray can't evaluate anything until the RNG is provided.  (This prevents large memory requirements)
 mtMapM :: Int -> (a -> IO b) -> [a] -> IO [b]
@@ -183,22 +183,23 @@ mtMapM n f l =
       groups = splitList n' l
    in do
         threads <-
-          startThreads
-            -- This forces evaluation of the whole list before the thread returns
-            (\x -> (\vals -> (last vals) `seq` vals) <$> (mapM f x))
-            groups
-        concat <$> (joinThreads threads)
+          startThreads (mapM f) groups
+        concat <$> (fmap SL.toList) <$> (joinThreads threads)
 
--- TODO: I'm not sure why this isn't parallelizing correct.  I suspect it has something to do with memory protection / mutexes since it doesn't happen with the test code at the bottom, but I do not know.
-rayTraceScene :: (ObjectCollection o) => Int -> RayTracer -> Scene o -> Int -> Camera -> IO [ColorRGBf]
-rayTraceScene n rt sc height cam =
-  let l = zip [1 ..] (genRays cam height)
+rayTraceScene :: (ObjectCollection o) => Int -> RayTracer -> Scene o -> Int -> IO [ColorRGBf]
+rayTraceScene n rt sc height =
+  let l = zip [1 ..] (genRays (sceneCamera sc) height)
       f x = traceRay rt sc x
    in mtMapM n f l
 
 testParallel2 n =
   do
-    _ <- mtMapM n (\x -> (\y -> y * y) <$> (\y -> head $ (randoms y) :: Float) <$> getStdGen) [1 .. 10000000]
+    res <-
+      mtMapM
+        n
+        (\_ -> (foldl (+) 2) <$> (\y -> take 100 $ (randoms y) :: [Float]) <$> getStdGen)
+        [1 .. 1000000]
+    print $ last res
     return ()
 
 testParallel =
