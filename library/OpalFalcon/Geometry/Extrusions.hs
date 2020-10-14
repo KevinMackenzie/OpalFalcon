@@ -5,6 +5,8 @@ import Control.Monad.ST
 import Data.STRef
 import qualified Data.Vector as VB
 import qualified Data.Vector.Storable as VS
+import qualified OpalFalcon.Geometry.Curves as C
+import qualified OpalFalcon.Geometry.Triangle as T
 import qualified OpalFalcon.Math.MMesh as MM
 import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
@@ -74,14 +76,21 @@ tesselateIndexedPoly points idxs dir =
           let pt0 = points VS.! idx0
               pt1 = points VS.! idx1
               pt2 = points VS.! idx2
-           in if (((pt1 |-| pt0) |><| (pt2 |-| pt0)) |.| dir) > 0
+              hasPoint pt = T.containsPoint (T.Tri pt0 pt1 pt2) $ points VS.! pt
+              tryNext = do
+                writeSTRef lRef l1
+                excludeTri mesh lRef
+           in if (((pt1 |-| pt0) |><| (pt2 |-| pt0)) |.| dir) > 0 -- fast check
                 then do
-                  MM.addTri mesh (MM.mkTri idx0 idx1 idx2)
-                  _ <- MList.erase l1
-                  shouldContinue lRef
-                else do
-                  writeSTRef lRef l1
-                  excludeTri mesh lRef
+                  n <- MList.nextRef l2
+                  anyInside <- or <$> (MList.mapSlice hasPoint n l0)
+                  if not anyInside -- slow check
+                    then do
+                      MM.addTri mesh (MM.mkTri idx0 idx1 idx2)
+                      _ <- MList.erase l1
+                      shouldContinue lRef
+                    else tryNext
+                else tryNext
       shouldContinue lRef =
         do
           l <- readSTRef lRef -- The 'inner' polygon

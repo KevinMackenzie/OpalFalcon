@@ -18,6 +18,7 @@ module OpalFalcon.Util.MutableList
     prevRef,
     erase,
     eraseRef,
+    mapSlice,
   )
 where
 
@@ -208,3 +209,12 @@ eraseRef nRefRef =
     (a, nRef') <- erase nRef
     writeSTRef nRefRef nRef'
     return a
+
+mapSlice :: (a -> b) -> STRef s (MList s a) -> STRef s (MList s a) -> ST s [b]
+mapSlice f begin end =
+  if begin == end
+    then return []
+    else do
+      v <- readRef begin
+      n <- nextRef begin
+      (f v :) <$> (mapSlice f n end)

@@ -15,3 +15,6 @@ fromList (h : t) = h :! (fromList t)
 toList :: List a -> [a]
 toList B = []
 toList (h :! t) = h : (toList t)
+
+forceList :: [a] -> [a]
+forceList = toList . fromList
