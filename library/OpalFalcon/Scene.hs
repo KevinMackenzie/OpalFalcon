@@ -8,12 +8,12 @@ where
 
 import Control.Monad.Random
 import qualified OpalFalcon.BaseTypes as Bt
-import qualified OpalFalcon.Math.Ray as R
+import qualified OpalFalcon.Math.Optics as R
 import OpalFalcon.Scene.Camera (Camera)
 
 class ObjectCollection c where
 
-  probeCollection :: c -> R.Ray -> Maybe Bt.Hit
+  probeCollection :: c -> R.Ray -> Maybe (Bt.Object, Bt.Hit)
 
   collectionLightSources :: c -> [Bt.LightSource]
 

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module OpalFalcon.Math.Vector where
 
 import Data.Word (Word8)
@@ -61,6 +62,18 @@ data Vec3 a = V3 !a !a !a
     deriving (Show, Read, Eq, Foldable, Functor)
 data Vec4 a = V4 !a !a !a !a
     deriving (Show, Read, Eq, Foldable, Functor)
+
+newtype UVec3 a = UV3 (Vec3 a)
+    deriving (Show, Read, Eq, Foldable, Functor, Applicative, Vector)
+
+type UVec3d = UVec3 Double
+
+inVec3 :: UVec3 a -> Vec3 a
+inVec3 (UV3 v) = v
+norm3 :: (Eq a, Floating a) => Vec3 a -> UVec3 a
+norm3 v = UV3 $ normalize v
+cross3 :: (Eq a, Floating a) => UVec3 a -> UVec3 a -> UVec3 a
+cross3 (UV3 v0) (UV3 v1) = norm3 $ v0 |><| v1
 
 -- Instances for low-dimmension vectors
 instance Applicative Vec2 where
@@ -287,12 +300,6 @@ toHomoPos v = toHomo v 1
 toHomoDir :: (Num a) => Vec3 a -> Vec4 a
 toHomoDir v = toHomo v 0
 
--- Reflection assumes 'norm' is normalized
---  Note: 'v' is centered at the origin; 'incoming' vectors must be flipped
-{-# INLINE reflect #-}
-reflect :: (Fractional a) => Vec3 a -> Vec3 a -> Vec3 a
-reflect v norm = ((2 * (v |.| norm)) *| norm) |-| v
-
 
 -- Random vector generation on the unit sphere.  These vectors can be transformed
 --   to make the results not uniformly sampled (i.e. for importance sampling)
@@ -354,8 +361,8 @@ fromSphere (V3 r theta psi) = (V3 x y z)
 
 -- Gets a vector orthagonal to the provided vector
 {-# INLINE getOrthoVec #-}
-getOrthoVec :: (Ord b, Floating b) => Vec3 b -> Vec3 b
-getOrthoVec v = normalize $ v |><| (if (mag (v |><| xAxis)) < 0.001 then yAxis else xAxis)
+getOrthoVec :: (Ord b, Floating b) => Vec3 b -> UVec3 b
+getOrthoVec v = norm3 $ v |><| (if (mag (v |><| xAxis)) < 0.001 then yAxis else xAxis)
 
 -- Returns true if 'x' is inside the slice of space at pos 'beg' with the vector 'end-beg'
 {-# INLINE isBetween #-}

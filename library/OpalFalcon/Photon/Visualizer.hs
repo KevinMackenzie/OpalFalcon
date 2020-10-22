@@ -7,7 +7,7 @@ import Data.Array
 import Data.Array.ST
 import Data.Maybe
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
 import OpalFalcon.Photon.Photon
@@ -79,8 +79,8 @@ renderIlluminance glob scene cam height =
   let shoot r =
         case probeCollection (sceneObjects scene) r of
           Nothing -> black
-          Just h -> {-trace (show c)-} c
+          Just (obj, h) -> {-trace (show c)-} c
             where
-              c = glob (hitPos h) (negateVec incDir) (hitNorm h) (surfaceBssrdf $ hitMat h)
+              c = glob (hitPos h) (negateVec incDir) (hitNorm h) (surfaceBssrdf $ objHitMat obj h)
               (Ray _ incDir) = hitInc h
    in map shoot $ genRays cam height

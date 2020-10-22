@@ -25,7 +25,8 @@ import OpalFalcon.Math
 import qualified OpalFalcon.Math.ConvexHull as CH
 import qualified OpalFalcon.Math.MMesh as MM
 import qualified OpalFalcon.Math.Matrix as M
-import OpalFalcon.Math.Ray
+import qualified OpalFalcon.Math.Optics as Optics
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
@@ -81,6 +82,7 @@ main = do
   stHeapTests <- testSpec "OpalFalcon.Photon.STHeap" stHeapSpec
   triMeshTests <- testSpec "OpalFalcon.Math.TriMesh" triMeshSpec
   utilTests <- testSpec "OpalFalcon.Util" utilSpec
+  opticsTests <- testSpec "OpalFalcon.Math" opticsSpec
   Test.Tasty.defaultMain $
     Test.Tasty.testGroup
       "OpalFalcon"
@@ -94,7 +96,8 @@ main = do
         triangleTests,
         stHeapTests,
         triMeshTests,
-        utilTests
+        utilTests,
+        opticsTests
       ]
 
 -- Only test non-trivial operations on vectors
@@ -222,11 +225,10 @@ triangleSpec =
   describe "Triangle" $ do
     describe "Intersection" $
       let t0 = OTRI.MkTriangle (V3 (-1) (-1) (-2)) (V3 1 0 (-2)) (V3 0 1 (-2))
-          tmat t _ = undefined
        in do
             it "hits front-face (from +z)" $
               let r = Ray (V3 0 0 1) (V3 0 0 (-1))
-                  mh = OTRI.hittestTriangle t0 tmat r
+                  mh = OTRI.hittestTriangle t0 r
                   hit = fromJust mh
                in do
                     ((isJust mh) `shouldBe` True)
@@ -236,7 +238,7 @@ triangleSpec =
                     ((hitInc hit) `shouldBe` r)
             it "hits front-face (from -z)" $
               let r = Ray (V3 0 0 (-1)) (V3 0 0 (-1))
-                  mh = OTRI.hittestTriangle t0 tmat r
+                  mh = OTRI.hittestTriangle t0 r
                   hit = fromJust mh
                in do
                     ((isJust mh) `shouldBe` True)
@@ -246,7 +248,7 @@ triangleSpec =
                     ((hitInc hit) `shouldBe` r)
             it "hits back-face" $
               let r = Ray (V3 0 0 (-5)) (V3 0 0 1)
-                  mh = OTRI.hittestTriangle t0 tmat r
+                  mh = OTRI.hittestTriangle t0 r
                   hit = fromJust mh
                in do
                     ((isJust mh) `shouldBe` True)
@@ -255,7 +257,7 @@ triangleSpec =
                     ((hitNorm hit) `shouldBe` zAxis)
                     ((hitInc hit) `shouldBe` r)
             it "misses back-face" $
-              let mh = OTRI.hittestTriangleFront t0 tmat (Ray (V3 0 0 (-5)) (V3 0 0 1))
+              let mh = OTRI.hittestTriangleFront t0 (Ray (V3 0 0 (-5)) (V3 0 0 1))
                in do
                     ((isNothing mh) `shouldBe` True)
 
@@ -576,10 +578,21 @@ utilSpec =
             l2 = runST $
               do
                 l <- MList.singleton 0
-                (_,l) <- MList.erase l
+                (_, l) <- MList.erase l
                 MList.toList l
          in do
               v `shouldBe` 0
               v2 `shouldBe` 1
               l1 `shouldBe` [1, 2, 3]
               l2 `shouldBe` []
+
+opticsSpec :: Spec
+opticsSpec =
+  describe "Optics" $ do
+    it "refract" $
+      let s2 = sqrt 2
+          toSrc = V3 (-s2) s2 0
+          refr = Optics.refract toSrc yAxis 0.9 1.0
+          refr' = V3 0.636396 (-0.771362) 0
+       in do
+            refr `shouldBeApprox` refr

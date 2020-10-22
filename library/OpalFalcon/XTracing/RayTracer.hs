@@ -1,6 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-
-{-# LANGAUGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module OpalFalcon.XTracing.RayTracer
   ( RayTracer (..),
@@ -22,7 +21,7 @@ import Data.Maybe
 import Debug.Trace
 import GHC.Float (double2Float, float2Double)
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Vector
 import OpalFalcon.Scene
 import OpalFalcon.Scene.Camera
@@ -48,60 +47,163 @@ ptEpsilon = 0.00001
 participateMedia :: (Monad m, RandomGen g, ObjectCollection o) => RayTracer -> Scene o -> ParticipatingMaterial -> Vec3d -> Vec3d -> ColorRGBf -> RandT g m ColorRGBf
 -- lInPos is the position that the incoming radiance 'lInRad' enters the medium, and 'lOutPos' is the position that the incoming radiance, along with all in-scattered radiance, exits the medium (where the ray entered the medium)
 -- 'probeInside' returns the intersection point of the medium
-participateMedia rt sc (ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = probeInside}) lInPos lOutPos lInRad =
-  -- Ray-march from the in position to the out position
-  let extinct x = (absorb x) |+| (scatter x)
-      albedo x = (scatter x) |/| (extinct x)
-      advDist x xsi = (- (log xsi)) / (vecAvgComp $ extinct x) -- importance sampled distance between scattering events
-      randNextEvt r@(Ray x _) = (\xsi -> (advanceRay r $ float2Double (advDist x xsi))) <$> getRandomNonZero
-      lightDir = normalize $ lOutPos |-| lInPos
-      attenuateMedium eventPos prevRad deltaPos = prevRad |*| (fmap (\x -> exp $ - x * (double2Float deltaPos)) (scatter eventPos))
-      marchGeneric f stopPos prevPos prevRad =
-        do
-          -- TODO: This ray direction could be cached
-          (Ray eventPos _) <- randNextEvt $ Ray prevPos $ normalize $ stopPos |-| prevPos
-          if isBetween prevPos stopPos eventPos
-            then-- The ray exited the volume before an event occured
-              return prevRad
-            else f eventPos prevPos prevRad >>= (marchGeneric f stopPos eventPos)
-      -- factors in attenuation through the medium and in-scattering of light
-      stepFull eventPos prevPos prevRad =
-        let deltaPos = distance eventPos prevPos
-            deltaPosF = double2Float deltaPos
-            prevContrib = attenuateMedium eventPos prevRad deltaPos
-         in do
-              -- Note: To avoid aliasing, jitter the sample location around 'eventPos'
-              singleScattering <- directContribution eventPos
-              multiScattering <- return $ volumeRadiance rt eventPos lightDir phase
-              return $ (singleScattering |* deltaPosF) |+| (multiScattering |* deltaPosF) |+| prevContrib
-      -- Only factors in the attenuation through the medium
-      stepDirectOnly samplePos prevPos prevRad =
-        return $ attenuateMedium samplePos prevRad $ distance samplePos prevPos
-      filterSample sPos (LightSample lPos _ _) =
-        let fromLightDir = normalize $ sPos |-| lPos
-         in case probeCollection (sceneObjects sc) (Ray lPos $ fromLightDir) of
-              Nothing -> True
-              Just h -> case (probeInside (Ray sPos $ negateVec fromLightDir)) of
-                Nothing -> False -- Thin geometry
-                Just exPos -> (hitPos h) ~= exPos
-      directContribution samplePos =
-        do
-          samples <- (filter (filterSample samplePos)) <$> (sampleLights sc)
-          contribs <-
-            mapM
-              ( \(LightSample lPos (AttenuationFunc atten) col) ->
-                  case (probeInside $ Ray samplePos $ normalize $ lPos |-| samplePos) of
-                    Nothing -> return black -- Thin geometry
-                    Just exPos ->
-                      marchGeneric
-                        stepDirectOnly
-                        samplePos
-                        exPos
-                        (col |* (atten samplePos))
-              )
-              samples
-          return $ vecSum contribs
-   in marchGeneric stepFull lOutPos lInPos lInRad
+participateMedia
+  rt
+  sc
+  ( ParticipatingMaterial
+      { participateAbsorb = absorb,
+        participateScatter = scatter,
+        participatePhase = phase,
+        participateExit = probeInside
+      }
+    )
+  lInPos
+  lOutPos
+  lInRad =
+    -- Ray-march from the in position to the out position
+    let extinct x = (absorb x) |+| (scatter x)
+        albedo x = (scatter x) |/| (extinct x)
+        advDist x xsi = (- (log xsi)) / (vecAvgComp $ extinct x) -- importance sampled distance between scattering events
+        randNextEvt r@(Ray x _) = (\xsi -> (advanceRay r $ float2Double (advDist x xsi))) <$> getRandomNonZero
+        lightDir = normalize $ lOutPos |-| lInPos
+        attenuateMedium eventPos prevRad deltaPos = prevRad |*| (fmap (\x -> exp $ - x * (double2Float deltaPos)) (scatter eventPos))
+        marchGeneric f stopPos prevPos prevRad =
+          do
+            -- TODO: This ray direction could be cached
+            (Ray eventPos _) <- randNextEvt $ Ray prevPos $ normalize $ stopPos |-| prevPos
+            if isBetween prevPos stopPos eventPos
+              then-- The ray exited the volume before an event occured
+                return prevRad
+              else f eventPos prevPos prevRad >>= (marchGeneric f stopPos eventPos)
+        -- factors in attenuation through the medium and in-scattering of light
+        stepFull eventPos prevPos prevRad =
+          let deltaPos = distance eventPos prevPos
+              deltaPosF = double2Float deltaPos
+              prevContrib = attenuateMedium eventPos prevRad deltaPos
+           in do
+                -- Note: To avoid aliasing, jitter the sample location around 'eventPos'
+                singleScattering <- directContribution eventPos
+                multiScattering <- return $ volumeRadiance rt eventPos lightDir phase
+                return $ (singleScattering |* deltaPosF) |+| (multiScattering |* deltaPosF) |+| prevContrib
+        -- Only factors in the attenuation through the medium
+        stepDirectOnly samplePos prevPos prevRad =
+          return $ attenuateMedium samplePos prevRad $ distance samplePos prevPos
+        filterSample sPos (LightSample lPos _ _) =
+          let fromLightDir = normalize $ sPos |-| lPos
+           in case probeCollection (sceneObjects sc) (Ray lPos $ fromLightDir) of
+                Nothing -> True
+                Just (_, h) -> case (probeInside (Ray sPos $ negateVec fromLightDir)) of
+                  Nothing -> False -- Thin geometry
+                  Just exHit -> (hitPos h) ~= (hitPos exHit)
+        directContribution samplePos =
+          do
+            samples <- (filter (filterSample samplePos)) <$> (sampleLights sc)
+            contribs <-
+              mapM
+                ( \(LightSample lPos (AttenuationFunc atten) col) ->
+                    case (probeInside $ Ray samplePos $ normalize $ lPos |-| samplePos) of
+                      Nothing -> return black -- Thin geometry
+                      Just exHit ->
+                        marchGeneric
+                          stepDirectOnly
+                          samplePos
+                          (hitPos exHit)
+                          (col |* (atten samplePos))
+                )
+                samples
+            return $ vecSum contribs
+     in marchGeneric stepFull lOutPos lInPos lInRad
+
+subsurfaceScatter :: (Monad m, RandomGen g, ObjectCollection c) => RayTracer -> Scene c -> ParticipatingMaterial -> Vec3d -> Vec3d -> RandT g m ColorRGBf -> RandT g m (Vec3 Float)
+subsurfaceScatter
+  rt
+  sc
+  ( ParticipatingMaterial
+      { participateAbsorb = absorb,
+        participateScatter = scatter,
+        participatePhase = phase,
+        participateExit = probeInside
+      }
+    )
+  lInPos
+  lOutPos
+  lInRad =
+    -- Ray-march from the in position to the out position
+    let extinct x = (absorb x) |+| (scatter x)
+        albedo x = (scatter x) |/| (extinct x)
+        advDist x xsi = (- (log xsi)) / (vecAvgComp $ extinct x) -- importance sampled distance between scattering events
+        randNextEvt r@(Ray x _) = (\xsi -> (advanceRay r $ float2Double (advDist x xsi))) <$> getRandomNonZero
+        lightDir = normalize $ lOutPos |-| lInPos
+        attenuateMedium eventPos prevRad deltaPos = prevRad |*| (fmap (\x -> exp $ - x * (double2Float deltaPos)) (scatter eventPos))
+        marchGeneric f stopPos prevPos prevRad =
+          do
+            -- TODO: This ray direction could be cached
+            (Ray eventPos _) <- randNextEvt $ Ray prevPos $ normalize $ stopPos |-| prevPos
+            if isBetween prevPos stopPos eventPos
+              then-- The ray exited the volume before an event occured
+                return prevRad
+              else f eventPos prevPos prevRad >>= (marchGeneric f stopPos eventPos)
+        marchBackwards f stopPos prevPos depth =
+          -- Technically this is the one that's forwards
+          let progress =
+                do
+                  -- TODO: This ray direction could be cached
+                  (Ray eventPos _) <- randNextEvt $ Ray prevPos $ normalize $ stopPos |-| prevPos
+                  if isBetween prevPos stopPos eventPos
+                    then-- The ray exited the volume before an event occured
+                      lInRad
+                    else
+                      marchBackwards
+                        f
+                        stopPos
+                        eventPos
+                        ((double2Float $ distance prevPos eventPos) * (vecAvgComp $ extinct eventPos) + depth)
+                        >>= (f eventPos prevPos)
+           in if depth > 2-- TODO: how to russian roulette this?
+                then do
+                  xsi <- getRandom
+                  if xsi > (0.5 :: Float)
+                    then return black
+                    else progress
+                else progress
+        -- factors in attenuation through the medium and in-scattering of light
+        stepFull eventPos prevPos prevRad =
+          let deltaPos = distance eventPos prevPos
+              deltaPosF = double2Float deltaPos
+              prevContrib = attenuateMedium eventPos prevRad deltaPos
+           in do
+                -- Note: To avoid aliasing, jitter the sample location around 'eventPos'
+                singleScattering <- directContribution eventPos
+                multiScattering <- return $ volumeRadiance rt eventPos lightDir phase
+                return $ (singleScattering |* deltaPosF) |+| (multiScattering |* deltaPosF) |+| prevContrib
+        -- Only factors in the attenuation through the medium
+        stepDirectOnly samplePos prevPos prevRad =
+          return $ attenuateMedium samplePos prevRad $ distance samplePos prevPos
+        filterSample sPos (LightSample lPos _ _) =
+          let fromLightDir = normalize $ sPos |-| lPos
+           in case probeCollection (sceneObjects sc) (Ray lPos $ fromLightDir) of
+                Nothing -> True
+                Just (_, h) -> case (probeInside (Ray sPos $ negateVec fromLightDir)) of
+                  Nothing -> False -- Thin geometry
+                  Just exHit -> (hitPos h) ~= (hitPos exHit)
+        directContribution samplePos =
+          do
+            samples <- (filter (filterSample samplePos)) <$> (sampleLights sc)
+            contribs <-
+              mapM
+                ( \(LightSample lPos (AttenuationFunc atten) col) ->
+                    case (probeInside $ Ray samplePos $ normalize $ lPos |-| samplePos) of
+                      Nothing -> return black -- Thin geometry
+                      Just exHit ->
+                        marchGeneric
+                          stepDirectOnly
+                          samplePos
+                          (hitPos exHit)
+                          (col |* (atten samplePos))
+                )
+                samples
+            return $ vecSum contribs
+     in marchBackwards stepFull lInPos lOutPos 0
 
 -- DIrect illumination on surfaces
 directIllum :: (Monad m, RandomGen g, ObjectCollection o) => Scene o -> Vec3d -> Vec3d -> Vec3d -> Bssrdf -> RandT g m ColorRGBf
@@ -109,7 +211,7 @@ directIllum scene pos rInDir norm (Bssrdf bssrdf) =
   let filterSample (LightSample lPos _ _) =
         case probeCollection (sceneObjects scene) (Ray lPos $ normalize $ pos |-| lPos) of
           Nothing -> True
-          Just h -> (hitPos h) ~= pos
+          Just (_, h) -> (hitPos h) ~= pos
    in do
         -- TODO: Unify this somehow with the sampling code above
         samples <- (filter filterSample) <$> (sampleLights scene)
@@ -128,13 +230,14 @@ traceRay rt sc ray =
       shootRay ray path
         | numBounces path > 5 = return $ V3 1 0 0 -- Too many bounces
         | otherwise = (shootRay' ray path)
-      shootRay' ray@(Ray _ rDir) path =
+      shootRay' ray path =
         case probeCollection (sceneObjects sc) ray of
           Nothing -> return $ V3 0 1 0 -- Background color
-          Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
+          Just (obj, h@(MkHit {hitPos = pos, hitNorm = norm, hitInc = (Ray _ hDir)})) ->
             let iDir = negateVec $ normalize hDir
                 pass oRay = shootRay (advanceRay oRay ptEpsilon) (HSpec : path)
                 passRefl oRay refl = (refl |*|) <$> (pass oRay)
+                m = objHitMat obj h
              in do
                   rayResult <- transmitRay m iDir
                   case rayResult of
@@ -148,11 +251,37 @@ traceRay rt sc ray =
                       -- Increment hit position so we are sure we're inside the geometry
                       case participateExit pMat $ advanceRay (Ray pos hDir) ptEpsilon of
                         Nothing -> pass $ Ray pos hDir -- Thin geometry
-                        Just lInPos ->
+                        Just lInHit ->
                           do
-                            incomingRad <- pass $ Ray pos hDir -- OK because ignoring interior hits
-                            samples <- replicateM 100 (participateMedia rt sc pMat lInPos pos incomingRad)
+                            incomingRad <- pass $ advanceRay (Ray (hitPos lInHit) hDir) ptEpsilon
+                            samples <- replicateM 100 (participateMedia rt sc pMat (hitPos lInHit) pos incomingRad)
                             return $ vecAverage samples
+                    RayScatter ScatteringMaterial {scatteringParticipate = pMat, scatteringRefract = ior} ->
+                      let (Just newRay) = refractIRay (IRay $ Ray pos hDir) (norm3 norm) 1.0 ior
+                       in case participateExit pMat $ advanceRay newRay ptEpsilon of
+                            Nothing -> pass $ Ray pos hDir -- Thin geometry
+                            Just lInHit ->
+                              let eRayM =
+                                    refractIRay
+                                      (IRay $ Ray (hitPos lInHit) (rayDir $ hitInc lInHit))
+                                      (norm3 $ negateVec $ hitNorm lInHit)
+                                      ior
+                                      1.0
+                               in case eRayM of
+                                    Nothing -> return $ V3 0 0 1
+                                    Just (exitingRay) -> do
+                                      vecAverage
+                                        <$> ( replicateM
+                                                100
+                                                ( subsurfaceScatter
+                                                    rt
+                                                    sc
+                                                    pMat
+                                                    (hitPos lInHit)
+                                                    pos
+                                                    (pass $ advanceRay exitingRay ptEpsilon)
+                                                )
+                                            )
       mf (n, x) = evalRandIO $ shootRay x []
    in mf ray
 
@@ -186,6 +315,7 @@ mtMapM n f l =
           startThreads (mapM f) groups
         concat <$> (fmap SL.toList) <$> (joinThreads threads)
 
+-- TODO: I'm not sure why this isn't parallelizing correct.  I suspect it has something to do with memory protection / mutexes since it doesn't happen with the test code at the bottom, but I do not know.
 rayTraceScene :: (ObjectCollection o) => Int -> RayTracer -> Scene o -> Int -> IO [ColorRGBf]
 rayTraceScene n rt sc height =
   let l = zip [1 ..] (genRays (sceneCamera sc) height)

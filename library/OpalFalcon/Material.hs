@@ -8,14 +8,14 @@ module OpalFalcon.Material
 where
 
 import Control.Monad.Random
-import GHC.Float (double2Float, float2Double)
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Lighting (cosWeightedDir)
 import OpalFalcon.Math.Vector
+import OpalFalcon.Math.Optics
 import OpalFalcon.Scene.Objects.Triangle
 
 -- Material with purely diffuse reflectivity
-mkDiffuseMat :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkDiffuseMat :: ColorRGBf -> UVec3d -> AppliedMaterial
 mkDiffuseMat refl norm =
   let brdf _ _ = refl |/ pi
       xmitRay _ = return RayTerm
@@ -24,7 +24,7 @@ mkDiffuseMat refl norm =
         if rrRand >= (vecAvgComp refl)
           then return PhotonAbsorb
           else do
-            oDir <- cosWeightedDir norm
+            oDir <- inVec3 <$> (cosWeightedDir norm)
             return $ PhotonStore oDir refl
    in AppliedMaterial
         { transmitRay = xmitRay,
@@ -36,7 +36,7 @@ triDebugMat :: Triangle -> Vec3d -> AppliedMaterial
 triDebugMat tri bc =
    mkDiffuseMat (double2FloatVec bc) (triangleNorm tri)
 
-mkDiffuseMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkDiffuseMatSchlick :: ColorRGBf -> UVec3d -> AppliedMaterial
 mkDiffuseMatSchlick refl norm =
   mkSchlickMat
     SchlickMat
@@ -47,7 +47,7 @@ mkDiffuseMatSchlick refl norm =
     norm
     (V3 0 0 1) -- If the material is isotropic, the grain direction does not matter
 
-mkSpecularMat :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkSpecularMat :: ColorRGBf -> UVec3d -> AppliedMaterial
 mkSpecularMat refl norm =
   let xmitRay iDir = return $ RayReflect (reflect iDir norm) refl
       xmitPhoton iDir = return $ PhotonReflect (reflect iDir norm) refl
@@ -58,7 +58,7 @@ mkSpecularMat refl norm =
         }
 
 -- Material with purely specular reflectivity
-mkSpecularMatSchlick :: ColorRGBf -> Vec3d -> AppliedMaterial
+mkSpecularMatSchlick :: ColorRGBf -> UVec3d -> AppliedMaterial
 mkSpecularMatSchlick refl norm =
   mkSchlickMat
     SchlickMat
@@ -144,20 +144,21 @@ schlickBRDF
 --      and source [An Inexpensive BRDF Model for Physically‐based Rendering (1994)]
 --  but there are some inconsistencies between them and errors in the original
 -- Henrick only references the 1993 one, but uses some equations from the 1994 one, so idk
-mkSchlickMat :: SchlickMaterial -> Vec3d -> Vec3d -> AppliedMaterial
+mkSchlickMat :: SchlickMaterial -> UVec3d -> Vec3d -> AppliedMaterial
 mkSchlickMat
   mat@(SchlickMat {schlickSpecularReflectance = f0, schlickRoughness = sigma})
   norm
   grainDir =
-    let brdf = schlickBRDF mat norm grainDir
+    let n' = inVec3 norm
+        brdf = schlickBRDF mat n' grainDir
         (reflDiffuse, reflGlossy, _) = schlickDeriveParameters sigma
         xmitRay iDir = do
           randVal <- getRandom -- Imporance sample the 3 brdf lobes
           if randVal < reflGlossy
             then do
               -- Glossy
-              hVec <- schlickRandomGlossyHalfVec mat norm grainDir
-              let oDir = reflect iDir hVec
+              hVec <- schlickRandomGlossyHalfVec mat n' grainDir
+              let oDir = reflect iDir (norm3 $ hVec)
                in return $ RayReflect oDir $ brdf False iDir oDir
             else
               if randVal < reflGlossy + reflDiffuse
@@ -176,15 +177,15 @@ mkSchlickMat
               if randVal < reflGlossy
                 then do
                   -- Glossy
-                  hVec <- schlickRandomGlossyHalfVec mat norm grainDir
-                  let oDir = reflect iDir hVec
+                  hVec <- schlickRandomGlossyHalfVec mat n' grainDir
+                  let oDir = reflect iDir (norm3 hVec)
                    in return $ PhotonReflect oDir f0
                 else
                   if randVal < reflGlossy + reflDiffuse
                     then do
                       -- Diffuse:
                       oDir <- cosWeightedDir norm
-                      return $ PhotonStore oDir f0
+                      return $ PhotonStore (inVec3 oDir) f0
                     else
                       let oDir = reflect iDir norm -- Specular
                        in return $ PhotonReflect oDir f0

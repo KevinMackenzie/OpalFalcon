@@ -13,7 +13,7 @@ import qualified OpalFalcon.KdTree as Kd
 import OpalFalcon.Material
 import OpalFalcon.Math.Lighting
 import qualified OpalFalcon.Math.MMesh as MM
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
@@ -40,13 +40,12 @@ genQuad p0 p1 p2 p3 =
    in (pts, tris)
 
 -- Generates a groomed region of snow with an open bottom plane
-genGroomedSurface :: Vec3d -> Vec3d -> Vec3d -> Double -> Double -> TMesh.TriMesh
-genGroomedSurface origin forward right xPitch yPitch =
+genGroomedCurve :: Vec3d -> Vec3d -> Vec3d -> Double -> Double -> VS.Vector Vec3d
+genGroomedCurve origin forward right xPitch yPitch =
   let wDir = normalize right
       width = mag right
       yDir = normalize $ right |><| forward
       numPeaks = floor $ width / xPitch
-      remainder = width - (fromIntegral numPeaks) * xPitch
       lowPoints =
         map
           ( \idx ->
@@ -59,25 +58,7 @@ genGroomedSurface origin forward right xPitch yPitch =
               ((((fromIntegral idx) + 0.5) * xPitch) *| wDir) |+| (yPitch *| yDir)
           )
           [0 .. numPeaks -1]
-      line = VS.fromList $ map (|+| origin) $ Misc.interleave (lowPoints ++ [right]) peakPoints
-      lineLen = VS.length line
-      (allPoints, tris) = Ext.extrudePolyLine line forward
-      endCaps0 =
-        VB.fromList $
-          map
-            ( \idx ->
-                MM.mkTri (2 * idx) (2 * idx + 2) (2 * idx + 1)
-            )
-            [0 .. numPeaks -1]
-      -- Remember to flip the norms
-      endCaps1 =
-        VB.fromList $
-          map
-            ( \idx ->
-                MM.mkTri (2 * idx + lineLen) (2 * idx + 1 + lineLen) (2 * idx + 2 + lineLen)
-            )
-            [0 .. numPeaks -1]
-   in TMesh.new allPoints (tris VB.++ endCaps0 VB.++ endCaps1)
+   in VS.fromList $ map (|+| origin) $ Misc.interleave (lowPoints ++ [right]) peakPoints
 
 getCamera :: Camera
 getCamera =
@@ -139,17 +120,28 @@ testScene0 = MkScene
     boundaryLeft = genLeftBank boundaryFunc 1
     boundaryRight = genRightBank boundaryFunc 1
     groomed = VS.fromList $ [V3 (- sceneMidWidth / 2) 0 0, V3 (sceneMidWidth / 2) 0 0]
+    -- groomed =
+    --   genGroomedCurve
+    --     (V3 (- sceneMidWidth / 2) 0 0)
+    --     (V3 0 0 (- sceneLength))
+    --     (V3 sceneMidWidth 0 0)
+    --     0.0381
+    --     0.0254
     bottomLeft = VS.fromList $ [V3 (- sceneMidWidth / 2 - sceneBankWidth) (-1) 0]
     bottomRight = VS.fromList $ [V3 (sceneMidWidth / 2 + sceneBankWidth) (-1) 0]
     line = VS.reverse $ VS.concat [bottomLeft, boundaryLeft, groomed, boundaryRight, bottomRight]
     solid =
-      mkTriMeshObject
-        (uncurry TMesh.new $ Ext.extrudePoly line (V3 0 0 (- sceneLength)))
-        ( pMeshMat
-            (\_ -> 0.05 *| whitef)
-            (\_ -> 2.0 *| whitef)
-            (PhaseFunc $ \_ _ -> whitef |/ (4 * pi)) -- (dMeshMat $ V3 0.8 0.7 0.7)
-        )
+      traceShow (VB.length $ TMesh.tris solidMesh) $
+        mkTriMeshObject
+          solidMesh
+          --(dMeshMat $ V3 0.8 0.7 0.7)
+          ( sMeshMat
+              (\_ -> 0.05 *| whitef)
+              (\_ -> 2.0 *| whitef)
+              (PhaseFunc $ \_ _ -> whitef |/ (4 * pi))
+              1
+          )
+    solidMesh = uncurry TMesh.new $ Ext.extrudePoly line (V3 0 0 (- sceneLength))
 
 genBank :: (Double -> Double) -> Int -> VS.Vector Vec3d
 genBank boundaryFunc subdiv =
@@ -191,10 +183,46 @@ genLeftBank boundaryFunc subdiv =
 --     boundaryRight = genRightBank boundaryFunc 10
 
 pSphereMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> Sphere -> Vec3d -> AppliedMaterial
-pSphereMat absorb scatter phase s hp = mkVolumeMat (ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = exitSphere s}) hp
+pSphereMat absorb scatter phase s hp =
+  mkVolumeMat
+    ( ParticipatingMaterial
+        { participateAbsorb = absorb,
+          participateScatter = scatter,
+          participatePhase = phase,
+          participateExit = hittestSphereInside s,
+          participateImportance = (\_ -> getRandom)
+        }
+    )
+    hp
 
 pMeshMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> TMesh.TriMesh -> Int -> Vec3d -> AppliedMaterial
-pMeshMat absorb scatter phase mesh idx bc = mkVolumeMat (ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = TMesh.exit mesh}) (TMesh.baryToWorld mesh idx bc)
+pMeshMat absorb scatter phase mesh idx bc =
+  mkVolumeMat
+    ( ParticipatingMaterial
+        { participateAbsorb = absorb,
+          participateScatter = scatter,
+          participatePhase = phase,
+          participateExit = TMesh.hittestTriMeshInside mesh,
+          participateImportance = (\_ -> getRandom)
+        }
+    )
+    (TMesh.baryToWorld mesh idx bc)
+
+sMeshMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> Double -> TMesh.TriMesh -> Int -> Vec3d -> AppliedMaterial
+sMeshMat absorb scatter phase ior mesh idx bc =
+  mkScatteringMat
+    ScatteringMaterial
+      { scatteringParticipate = ParticipatingMaterial
+          { participateAbsorb = absorb,
+            participateScatter = scatter,
+            participatePhase = phase,
+            participateExit = TMesh.hittestTriMeshInside mesh,
+            participateImportance = (\_ -> getRandom)
+          },
+        scatteringRefract = ior
+      }
+    (TMesh.triNorm mesh idx)
+    (TMesh.baryToWorld mesh idx bc)
 
 dTriMat :: ColorRGBf -> Triangle -> Vec3d -> AppliedMaterial
 dTriMat d t _ = mkDiffuseMat d (triangleNorm t)

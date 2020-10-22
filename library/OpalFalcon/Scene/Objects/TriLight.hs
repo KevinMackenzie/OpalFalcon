@@ -8,7 +8,7 @@ where
 import Control.Monad.Random
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Lighting
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Vector
 import qualified OpalFalcon.Photon.PhotonTracer as PT
 import OpalFalcon.Scene.Objects.PointLight
@@ -34,5 +34,5 @@ emitTriPhotons (MkTL lTri lCol lPow) cnt =
     pts <- Misc.repeatMF (toInteger cnt) $ randTriPt lTri
     return
       $ map
-        (\(d, pt) -> EPhoton (Ray pt d) ((lCol |* lPow) |/ (fromIntegral cnt)))
+        (\(d, pt) -> EPhoton (Ray pt $ inVec3 d) ((lCol |* lPow) |/ (fromIntegral cnt)))
       $ zip dirs pts

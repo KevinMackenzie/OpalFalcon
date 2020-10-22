@@ -17,7 +17,7 @@ import qualified OpalFalcon.KdTree as Kd
 import OpalFalcon.Material
 import OpalFalcon.Math.Lighting
 import qualified OpalFalcon.Math.MMesh as MM
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
@@ -46,8 +46,10 @@ import System.Environment
 import System.Process
 import System.Random
 import qualified TestScene as TS
+import qualified CornellBox as CB
 
 sceneToRender :: Scene.Scene ObjectList
+-- sceneToRender = CB.scene
 sceneToRender = TS.testScene0
 
 printHits hs =
@@ -111,6 +113,20 @@ mpMap n f_out f_in l =
 traceRays_ :: Scene.ObjectCollection o => RayTracer -> Scene.Scene o -> [(Integer, Ray)] -> IO [ColorRGBf]
 traceRays_ rt sc = mapM (\x -> traceRay rt sc x)
 
+fJoin :: (a -> String) -> String -> [a] -> String
+fJoin _ _ [] = ""
+fJoin f _ (h:[]) = f h
+fJoin f d (h:t) = (f h) ++ d ++ (fJoin f d t)
+showJoin :: (Show a) => String -> [a] -> String
+showJoin = fJoin show
+strJoin :: String -> [String] -> String
+strJoin = fJoin id
+phToCsv :: Photon -> String
+phToCsv (Photon (V3 x y z) (V3 r g b) (V3 xn yn zn) _) =
+  strJoin "," $ [showJoin "," [x,y,z], showJoin "," [r,g,b], showJoin "," [xn,yn,zn]]
+phlToCsv :: [Photon] -> String
+phlToCsv pl = strJoin "\n" $ "x,y,z,r,g,b,xn,yn,zn":(map phToCsv pl)
+
 runMaster :: [String] -> IO ()
 runMaster (workerBin : (numProcsStr : (hstr : (outFile : _)))) =
   let incand = (V3 255 214 170)
@@ -129,6 +145,7 @@ runMaster (workerBin : (numProcsStr : (hstr : (outFile : _)))) =
               -- mtWorkerMain numProcs sPhs vPhs rays
               writeFile "sPmap.bin" (show sPhs)
               writeFile "vPmap.bin" (show vPhs)
+              writeFile "vPmap.csv" (phlToCsv vPhs)
               mpMap numProcs (launchWorker workerBin) joinWorker rays
         saveToPngRtr outFile pixs w h
 

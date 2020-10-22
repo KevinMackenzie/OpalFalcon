@@ -2,7 +2,7 @@ module OpalFalcon.Scene.Camera where
 
 import Data.Array
 import OpalFalcon.Math.Matrix
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
 

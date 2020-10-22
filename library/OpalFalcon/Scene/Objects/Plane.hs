@@ -5,7 +5,7 @@ module OpalFalcon.Scene.Objects.Plane (
     hittestPlane
     ) where
 
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Transformations
 import OpalFalcon.BaseTypes
@@ -15,12 +15,12 @@ type PlaneMat = Plane -> Vec3d -> AppliedMaterial
 newtype Plane = MkPlane VectorSpace
 
 -- Hittest that ignores backface hits
-hittestPlaneFront :: Plane -> PlaneMat -> Ray -> Maybe Hit
-hittestPlaneFront p@(MkPlane space) mat r@(Ray _ rDir) = if ((zDir space) |.| rDir) > 0 then Nothing else hittestPlane p mat r
+hittestPlaneFront :: Plane -> Ray -> Maybe Hit
+hittestPlaneFront p@(MkPlane space) r@(Ray _ rDir) = if ((zDir space) |.| rDir) > 0 then Nothing else hittestPlane p r
 
 -- Hittests either side of a plane
-hittestPlane :: Plane -> PlaneMat -> Ray -> Maybe Hit
-hittestPlane plane@(MkPlane space) mat r@(Ray rPos rDir) =
+hittestPlane :: Plane -> Ray -> Maybe Hit
+hittestPlane (MkPlane space) r@(Ray rPos rDir) =
     let pDir = zDir space
         pPos = spacePos space
         d = pDir |.| rDir
@@ -32,6 +32,6 @@ hittestPlane plane@(MkPlane space) mat r@(Ray rPos rDir) =
                         , hitNorm = pDir
                         , hitInc = r
                         , hitParam = p
-                        , hitMat = mat plane hPos
+                        , hitCoords = HitLocal hPos
                         }
 

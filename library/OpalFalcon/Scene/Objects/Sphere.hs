@@ -1,7 +1,10 @@
 module OpalFalcon.Scene.Objects.Sphere
   ( SphereMat,
     Sphere (MkSphere),
+    sphereNorm,
     hittestSphere,
+    hittestSphereInside,
+    lookupSphereHitMat,
     exitSphere,
   )
 where
@@ -10,7 +13,7 @@ where
 
 import Debug.Trace
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
 
@@ -18,22 +21,29 @@ type SphereMat = Sphere -> Vec3d -> AppliedMaterial
 
 data Sphere = MkSphere VectorSpace Double
 
-hittestSphere :: Sphere -> SphereMat -> Ray -> Maybe Hit
-hittestSphere s m r =
-  (calcSphereHit s m r) <$> (intersectSphere s r)
+hittestSphere :: Sphere -> Ray -> Maybe Hit
+hittestSphere s r =
+  (calcSphereHit s r) <$> (intersectSphere s r)
 
-calcSphereHit :: Sphere -> SphereMat -> Ray -> Double -> Hit
-calcSphereHit sphere@(MkSphere space _) mat r p =
-  let sPos = spacePos space
-      hPos = pointAtParameter r p
-      norm = normalize $ hPos |-| sPos
+hittestSphereInside :: Sphere -> Ray -> Maybe Hit
+hittestSphereInside = hittestSphere
+
+calcSphereHit :: Sphere -> Ray -> Double -> Hit
+calcSphereHit sph r p =
+  let hPos = pointAtParameter r p
    in MkHit
         { hitPos = hPos,
-          hitNorm = norm,
+          hitNorm = inVec3 $ sphereNorm sph hPos,
           hitInc = r,
           hitParam = p,
-          hitMat = mat sphere hPos
+          hitCoords = HitNone
         }
+
+lookupSphereHitMat :: Sphere -> SphereMat -> Hit -> AppliedMaterial
+lookupSphereHitMat sphere mat hit = mat sphere $ hitPos hit
+
+sphereNorm :: Sphere -> Vec3d -> UVec3d
+sphereNorm (MkSphere sp _) p = norm3 $ p |-| (spacePos sp)
 
 exitSphere :: Sphere -> Ray -> Maybe Vec3d
 exitSphere s@(MkSphere space rad) r@(Ray pos _) =
@@ -56,7 +66,7 @@ filterNegativeParameters (p0, p1) =
     (Nothing, Just tm) -> Just tm
     (Just tp, Just tm) -> Just $ min tp tm
 
--- Basic Ray-sphere intersection: will return negative results
+-- Basic Ray-sphere intersection, interior hits, but no hits behind the ray
 getSphereParameters :: Sphere -> Ray -> (Maybe Double, Maybe Double)
 getSphereParameters (MkSphere space rad) (Ray rPos rDir) =
   let sPos = spacePos space

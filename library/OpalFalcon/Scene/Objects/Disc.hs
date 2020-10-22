@@ -5,7 +5,7 @@ module OpalFalcon.Scene.Objects.Disc (
     ) where
 
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Vector
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Scene.Objects.Plane
@@ -17,9 +17,9 @@ data Disc = MkDisc Plane Double
 discMatToPlaneMat :: Disc -> DiscMat -> PlaneMat
 discMatToPlaneMat (MkDisc _ d) mat plane = mat (MkDisc plane d)
 
-hittestDisc :: Disc -> DiscMat -> Ray -> Maybe Hit
-hittestDisc q@(MkDisc p _) mat r =
-    case (hittestPlane p (discMatToPlaneMat q mat) r) of
+hittestDisc :: Disc -> Ray -> Maybe Hit
+hittestDisc q@(MkDisc p _) r =
+    case (hittestPlane p r) of
         Nothing -> Nothing
         Just h -> cropPlaneHit q h
 

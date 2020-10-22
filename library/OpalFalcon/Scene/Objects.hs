@@ -19,7 +19,8 @@ mkSphereObject :: Sphere -> SphereMat -> Bt.Object
 mkSphereObject sphere@(MkSphere space _) mat =
   Bt.MkObj
     { objPos = spacePos space,
-      objIntersectRay = S.hittestSphere sphere mat,
+      objIntersectRay = S.hittestSphere sphere,
+      objHitMat = (\h -> mat sphere (hitPos h)),
       objLightSource = Nothing
     }
 
@@ -27,7 +28,8 @@ mkPlaneObject :: Plane -> PlaneMat -> Bt.Object
 mkPlaneObject plane@(MkPlane space) mat =
   Bt.MkObj
     { objPos = spacePos space,
-      objIntersectRay = P.hittestPlaneFront plane mat,
+      objIntersectRay = P.hittestPlaneFront plane,
+      objHitMat = (\h -> mat plane (hitPos h)),
       objLightSource = Nothing
     }
 
@@ -35,7 +37,8 @@ mkDiscObject :: Disc -> DiscMat -> Bt.Object
 mkDiscObject disc@(MkDisc (MkPlane space) _) mat =
   Bt.MkObj
     { objPos = spacePos space,
-      objIntersectRay = D.hittestDisc disc mat,
+      objIntersectRay = D.hittestDisc disc,
+      objHitMat = (\h -> mat disc (hitPos h)),
       objLightSource = Nothing
     }
 
@@ -43,7 +46,8 @@ mkTriangleObject :: Triangle -> TriangleMat -> Bt.Object
 mkTriangleObject triangle mat =
   Bt.MkObj
     { objPos = T.trianglePos triangle,
-      objIntersectRay = T.hittestTriangleFront triangle mat,
+      objIntersectRay = T.hittestTriangleFront triangle,
+      objHitMat = (\h -> mat triangle $ hitLocal h),
       objLightSource = Nothing
     }
 
@@ -51,7 +55,8 @@ mkTriangleObjectFull :: Triangle -> TriangleMat -> ColorRGBf -> Float -> Bt.Obje
 mkTriangleObjectFull t mat col pow =
   Bt.MkObj
     { objPos = T.trianglePos t,
-      objIntersectRay = T.hittestTriangleFront t mat,
+      objIntersectRay = T.hittestTriangleFront t,
+      objHitMat = (\h -> mat t $ hitLocal h),
       objLightSource = Just $ MkLight
         { lightSample = TL.sampleTriLight 20 (TL.MkTL t col pow),
           emitPhotons = TL.emitTriPhotons (TL.MkTL t col pow)
@@ -62,7 +67,8 @@ mkTriMeshObject :: TMesh.TriMesh -> TMesh.TriMeshMat -> Bt.Object
 mkTriMeshObject mesh mat =
   Bt.MkObj
     { objPos = origin, -- TODO
-      objIntersectRay = TMesh.hittestTriMeshOutside mesh mat,
+      objIntersectRay = TMesh.hittestTriMeshOutside mesh,
+      objHitMat = (\h -> uncurry (mat mesh) $ hitIndexed h),
       objLightSource = Nothing
     }
 

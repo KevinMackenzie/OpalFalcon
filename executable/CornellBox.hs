@@ -12,7 +12,7 @@ import qualified OpalFalcon.KdTree as Kd
 import OpalFalcon.Material
 import OpalFalcon.Math.Lighting
 import qualified OpalFalcon.Math.MMesh as MM
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import qualified OpalFalcon.Math.TriMesh as TMesh
 import OpalFalcon.Math.Vector
@@ -46,7 +46,7 @@ cboxCam = Camera
 scene :: Scene ObjectList
 scene = MkScene
   { sceneObjects = MkObjList
-      { objList = [left0, left1, right0, right1, top0, top1, bottom0, bottom1, back0, back1, light0, light1] ++ qp0 ++ qp1
+      { objList = [left0, left1, right0, right1, top0, top1, bottom0, bottom1, back0, back1, light0, light1, pSphere, sphre] -- ++ qp0 ++ qp1
       },
     sceneCamera = cboxCam
   }
@@ -65,8 +65,8 @@ scene = MkScene
     lrb = V3 0.5 1.999 (-0.5)
     diffT d t _ = mkDiffuseMat d (triangleNorm t)
     diffM d = (\m idx _ -> mkDiffuseMat d (TMesh.triNorm m idx))
-    leftMat = diffT (V3 1 0 0)
-    rightMat = diffT (V3 0 0 1)
+    leftMat = diffT $ 0.84 *| ((V3 170 70 70) |/ 255)
+    rightMat = diffT $ 0.84 *| ((V3 68 93 156) |/ 255)
     greenMat = diffT (V3 0 1 0)
     blankMat = diffT (V3 0.84 0.84 0.84)
     lightMat = diffT (V3 0 0 0)
@@ -80,19 +80,19 @@ scene = MkScene
     top1 = mkTriangleObject (MkTriangle vrtf vltb vrtb) blankMat
     bottom0 = mkTriangleObject (MkTriangle vrbf vrbb vlbb) blankMat
     bottom1 = mkTriangleObject (MkTriangle vrbf vlbb vlbf) blankMat
-    back0 = mkTriangleObject (MkTriangle vrtb vltb vlbb) greenMat
-    back1 = mkTriangleObject (MkTriangle vrtb vlbb vrbb) greenMat
+    back0 = mkTriangleObject (MkTriangle vrtb vltb vlbb) blankMat
+    back1 = mkTriangleObject (MkTriangle vrtb vlbb vrbb) blankMat
     light0Tri = MkTriangle lrb lrf llf
     light1Tri = MkTriangle llf llb lrb
-    light0 = mkTriangleObjectFull light0Tri lightMat whitef 25
-    light1 = mkTriangleObjectFull light1Tri lightMat whitef 25
+    light0 = mkTriangleObjectFull light0Tri lightMat whitef 12
+    light1 = mkTriangleObjectFull light1Tri lightMat whitef 12
     mesh = mkTriMeshObject mesh0 (diffM $ gray 0.3) -- (pMeshMat (\_ -> constVec 0.2) (\_ -> constVec 1.0) (PhaseFunc (\_ _ -> whitef |/ (4 * pi))))
-    sphre = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (sphereMat (V3 0.9 0.9 0.6))
-    pSphere = mkSphereObject (MkSphere (mkAffineSpace (V3 0.3 (-1.25) 0) xAxis yAxis zAxis) 0.75) (pSphereMat (\_ -> constVec 0.2) (\_ -> constVec 1.0) (PhaseFunc (\_ _ -> whitef |/ (4 * pi))))
+    sphre = mkSphereObject (MkSphere (mkAffineSpace (V3 (-0.9) (-1.25) (-0.9)) xAxis yAxis zAxis) 0.75) (sphereMat (V3 0.9 0.9 0.6))
+    pSphere = mkSphereObject (MkSphere (mkAffineSpace (V3 0.9 (-1.25) 0.7) xAxis yAxis zAxis) 0.75) (sSphMat (\_ -> constVec 0.05) (\_ -> constVec 10.0) (PhaseFunc (\_ _ -> whitef |/ (4 * pi))) 1.5)
     qp0 = Ext.mkQuadPrism (V3 (-0.5) (-1) (-0.6)) (normalize $ V3 3 0 (-1)) yAxis (normalize $ V3 1 0 3) (V3 0.5 1 0.5) boxMat
     qp1 = Ext.mkQuadPrism (V3 1 (-1.5) 1) (normalize $ V3 3 0 1) yAxis (normalize $ V3 (-1) 0 3) (V3 0.75 0.5 0.75) blankMat
 
-sphereMat refl (MkSphere s _) hp = mkSpecularMat refl (normalize (hp |-| (affineTranslate s)))
+sphereMat refl s hp = mkSpecularMat refl $ sphereNorm s hp
 
 mesh0 =
   TMesh.new
@@ -152,3 +152,13 @@ mesh0 =
           MM.mkTri 4 15 5 -- Top Ridge 6 1
         ]
     )
+
+sSphMat :: (Vec3d -> ColorRGBf) -> (Vec3d -> ColorRGBf) -> PhaseFunc -> Double -> Sphere -> Vec3d -> AppliedMaterial
+sSphMat absorb scatter phase ior sphere bc =
+  mkScatteringMat
+    ScatteringMaterial
+      { scatteringParticipate = ParticipatingMaterial {participateAbsorb = absorb, participateScatter = scatter, participatePhase = phase, participateExit = hittestSphere sphere, participateImportance = (\_ -> getRandom)},
+        scatteringRefract = ior
+      }
+    (sphereNorm sphere bc)
+    bc

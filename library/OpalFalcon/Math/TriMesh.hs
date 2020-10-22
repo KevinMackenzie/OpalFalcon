@@ -2,7 +2,7 @@ module OpalFalcon.Math.TriMesh
   ( TriMesh (vertices, edges, polys, tris),
     new,
     fromMutableMesh,
-    TriMeshMat (..),
+    TriMeshMat,
     hittestTriMeshInside,
     hittestTriMeshOutside,
     triNorm,
@@ -17,12 +17,12 @@ import qualified Data.Vector as VB
 import qualified Data.Vector.Storable as VS
 import Debug.Trace
 import OpalFalcon.BaseTypes
+import qualified OpalFalcon.Geometry.Triangle as Tri
 import qualified OpalFalcon.Math.MMesh as MM
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Vector
 import qualified OpalFalcon.Scene.Objects.Triangle as T
 import OpalFalcon.Util.Misc
-import qualified OpalFalcon.Geometry.Triangle as Tri
 
 -- A closed triangle mesh object
 -- TODO: this assumes, not enforces, the closed mesh property
@@ -82,10 +82,10 @@ new points ts =
     fromMutableMesh mm
 
 {-# INLINE triNorm #-}
-triNorm :: TriMesh -> Int -> Vec3d
+triNorm :: TriMesh -> Int -> UVec3d
 triNorm mesh idx =
   let (a, b, c) = index mesh idx
-   in normalize $ (b |-| a) |><| (c |-| a)
+   in norm3 $ (b |-| a) |><| (c |-| a)
 
 {-# INLINE index #-}
 index :: TriMesh -> Int -> (Vec3d, Vec3d, Vec3d)
@@ -110,11 +110,11 @@ type TriMeshMat = TriMesh -> Int -> Vec3d -> AppliedMaterial
 triMeshTriMat :: TriMeshMat -> TriMesh -> Int -> T.Triangle -> Vec3d -> AppliedMaterial
 triMeshTriMat tmm tm idx _ bc = tmm tm idx bc
 
-hittestTriMeshOutside :: TriMesh -> TriMeshMat -> Ray -> Maybe Hit
+hittestTriMeshOutside :: TriMesh -> Ray -> Maybe Hit
 hittestTriMeshOutside = hittestTriMesh T.hittestTriangleFront
 
-hittestTriMeshInside :: TriMesh -> TriMeshMat -> Ray -> Maybe Hit
-hittestTriMeshInside = hittestTriMesh T.hittestTriangleBack
+hittestTriMeshInside :: TriMesh -> Ray -> Maybe Hit
+hittestTriMeshInside tm r = (flipHitNorm) <$> (hittestTriMesh T.hittestTriangleBack tm r)
 
 -- TODO: this is being asked to "exit" from points that are not inside the mesh...
 -- The triangle intersection returns barycentric coords on the triangle, and not world-space position
@@ -138,9 +138,21 @@ exit mesh r =
     Just p -> Just $ pointAtParameter r p
 
 -- Hittests each tri in the mesh.  Should be absorbed into scene because scene could have better spacial data structure
-hittestTriMesh :: (T.Triangle -> T.TriangleMat -> Ray -> Maybe Hit) -> TriMesh -> TriMeshMat -> Ray -> Maybe Hit
-hittestTriMesh f mesh mat ray@(Ray pos _) =
-  foldr (closerHit pos) Nothing $ map (\tri -> f (indexAsScTri mesh tri) (triMeshTriMat mat mesh tri) ray) [0 .. VB.length (tris mesh) -1]
+hittestTriMesh :: (T.Triangle -> Ray -> Maybe Hit) -> TriMesh -> Ray -> Maybe Hit
+hittestTriMesh f mesh ray@(Ray pos _) =
+  let triIdxs = [0 .. VB.length (tris mesh) -1]
+      hits = zipF triIdxs $ map (\tri -> f (indexAsScTri mesh tri) ray) triIdxs
+      accum (_, h1) (_, h2) = closerHit pos h1 h2
+   in case foldr (maybeCompare accum) Nothing hits of
+        Nothing -> Nothing
+        Just (i, h) ->
+          Just MkHit
+            { hitPos = hitPos h,
+              hitInc = hitInc h,
+              hitParam = hitParam h,
+              hitNorm = hitNorm h,
+              hitCoords = HitIndexed i $ hitCoords h
+            }
 
 -- This is wrong
 insideTriMesh :: TriMesh -> Vec3d -> Bool

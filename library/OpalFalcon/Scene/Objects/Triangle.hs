@@ -17,11 +17,9 @@ where
 
 import Control.Monad.Random
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray
-import OpalFalcon.Math.Transformations
-import OpalFalcon.Math.Vector
-
 import qualified OpalFalcon.Geometry.Triangle as Tri
+import OpalFalcon.Math.Optics
+import OpalFalcon.Math.Vector
 
 -- Note: The parameter for triangular materials is in barycentric coords.  I think this lets us interpolate across UV parameters easily for textured triangles
 type TriangleMat = Triangle -> Vec3d -> AppliedMaterial
@@ -33,24 +31,24 @@ trianglePos :: Triangle -> Vec3d
 trianglePos (MkTriangle v0 v1 v2) = (v0 |+| v1 |+| v2) |/ 3
 
 -- Gets the normalized triangle surface normal
-triangleNorm :: Triangle -> Vec3d
-triangleNorm = normalize . triangleNorm_
+triangleNorm :: Triangle -> UVec3d
+triangleNorm = norm3 . triangleNorm_
 
 -- Gets the non-normalized triangle surface normal
 triangleNorm_ :: Triangle -> Vec3d
 triangleNorm_ (MkTriangle v0 v1 v2) = (v1 |-| v0) |><| (v2 |-| v0)
 
 -- Hittest that ignores backface hits
-hittestTriangleFront :: Triangle -> TriangleMat -> Ray -> Maybe Hit
-hittestTriangleFront t mat r@(Ray _ rDir) =
+hittestTriangleFront :: Triangle -> Ray -> Maybe Hit
+hittestTriangleFront t r@(Ray _ rDir) =
   if ((triangleNorm_ t) |.| rDir) >= 0
     then Nothing
-    else hittestTriangle t mat r
+    else hittestTriangle t r
 
 -- Hittest that ignores frontface hits
-hittestTriangleBack :: Triangle -> TriangleMat -> Ray -> Maybe Hit
-hittestTriangleBack (MkTriangle v0 v1 v2) mat r =
-  hittestTriangleFront (MkTriangle v0 v2 v1) mat r
+hittestTriangleBack :: Triangle -> Ray -> Maybe Hit
+hittestTriangleBack (MkTriangle v0 v1 v2) r =
+  hittestTriangleFront (MkTriangle v0 v2 v1) r
 
 intersectTriangle :: Triangle -> Ray -> Maybe (Double, Vec3d, Vec3d)
 intersectTriangle t@(MkTriangle v0 v1 v2) r@(Ray rPos rDir) =
@@ -74,8 +72,8 @@ intersectTriangle t@(MkTriangle v0 v1 v2) r@(Ray rPos rDir) =
 
 -- Hittests the front side of the triangle
 -- https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution
-hittestTriangle :: Triangle -> TriangleMat -> Ray -> Maybe Hit
-hittestTriangle t@(MkTriangle v0 v1 v2) mat r@(Ray rPos rDir) =
+hittestTriangle :: Triangle -> Ray -> Maybe Hit
+hittestTriangle t r =
   case intersectTriangle t r of
     Nothing -> Nothing
     Just (p, n, b) ->
@@ -84,7 +82,7 @@ hittestTriangle t@(MkTriangle v0 v1 v2) mat r@(Ray rPos rDir) =
           hitNorm = n,
           hitInc = r,
           hitParam = p,
-          hitMat = mat t b
+          hitCoords = HitLocal b
         }
 
 -- The point doesn't have to be on the triangle (can be above / below)
@@ -99,7 +97,7 @@ pointInTriangle (MkTriangle p0 p1 p2) pt =
 {-# INLINE insideTriPlane #-}
 insideTriPlane :: Triangle -> Vec3d -> Bool
 insideTriPlane tri@(MkTriangle p0 _ _) pt =
-  (triangleNorm tri) |.| (pt |-| p0) <= 0
+  (inVec3 $ triangleNorm tri) |.| (pt |-| p0) <= 0
 
 -- Credit: Shape Distributions, ACM ToG Vol 21. No4, Oct 2002 p814
 --  (https://www.cs.princeton.edu/~funk/tog02.pdf)

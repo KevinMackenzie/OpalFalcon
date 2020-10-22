@@ -3,8 +3,9 @@
 module OpalFalcon.BaseTypes where
 
 import Control.Monad.Random
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics (Ray)
 import OpalFalcon.Math.Vector
+import qualified OpalFalcon.Util.Misc as Misc
 
 -- These use the current position as the origin of the two vectors (so incoming vectors are "flipped")
 --                        lInPos lInDir    lOutPos lOutDir    3 band color distrib
@@ -21,31 +22,61 @@ newtype Brdf = Brdf (Vec3d -> Vec3d -> ColorRGBf)
 -- A BRDF with the "lOutDir" alrady applied
 newtype RayBrdf = RayBrdf (Vec3d -> ColorRGBf)
 
+mkRayBssrdf :: Bssrdf -> (Vec3d, Vec3d) -> RayBssrdf
 mkRayBssrdf (Bssrdf bssrdf) rayInc = RayBssrdf $ flip bssrdf rayInc
 
+mkRayBrdf :: Brdf -> Vec3d -> RayBrdf
 mkRayBrdf (Brdf brdf) rayIncDir = RayBrdf $ flip brdf rayIncDir
 
+mkBssrdf :: Brdf -> Bssrdf
 mkBssrdf (Brdf brdf) = Bssrdf (\(_, iDir) (_, oDir) -> brdf iDir oDir)
 
+mkBrdf :: Bssrdf -> Vec3d -> Brdf
 mkBrdf (Bssrdf bssrdf) pos = Brdf $ (\i o -> bssrdf (pos, i) (pos, o))
+
+-- I really don't like this
+data HitCoords
+  = HitNone
+  | HitLocal Vec3d
+  | HitIndexed Int HitCoords
+  deriving (Show)
 
 data Hit
   = MkHit
       { hitPos :: Vec3d,
+        -- NOTE: Norms on interior hits also point outwards
         hitNorm :: Vec3d,
         hitInc :: Ray, -- The ray used to shoot this hit
         hitParam :: Double,
-        hitMat :: AppliedMaterial
+        -- I really don't like this
+        hitCoords :: HitCoords
       }
 
+hitLocal :: Hit -> Vec3d
+hitLocal h = (\(HitLocal v) -> v) (hitCoords h)
+
+hitIndexed :: Hit -> (Int, Vec3d)
+hitIndexed h = (\(HitIndexed i (HitLocal v)) -> (i, v)) (hitCoords h)
+
+flipHitNorm :: Hit -> Hit
+flipHitNorm h =
+  MkHit
+    { hitPos = hitPos h,
+      hitNorm = negateVec $ hitNorm h,
+      hitInc = hitInc h,
+      hitParam = hitParam h,
+      hitCoords = hitCoords h
+    }
+
 instance Show Hit where
-  show h = (foldl (\x -> (\y -> (++) x ((++) "\n    " y))) "Hit {" [(show $ hitPos h), (show $ hitNorm h), (show $ hitInc h), (show $ hitParam h)]) ++ "\n}\n"
+  show h = (foldl (\x -> (\y -> (++) x ((++) "\n    " y))) "Hit {" [(show $ hitPos h), (show $ hitNorm h), (show $ hitInc h), (show $ hitParam h), (show $ hitCoords h)]) ++ "\n}\n"
 
 -- Object collects the minimum definition for an ray-tracable object
 data Object
   = MkObj
       { objPos :: Vec3d,
         objIntersectRay :: Ray -> Maybe Hit,
+        objHitMat :: Hit -> AppliedMaterial,
         objLightSource :: Maybe LightSource
       }
 
@@ -58,10 +89,11 @@ type Path = [HitType]
 data RayTransmitResult
   = RayReflect Vec3d ColorRGBf -- Note: Reflectance needed here because BRDF of surfaces may have delta function
   | RayParticipate ParticipatingMaterial
+  | RayScatter ScatteringMaterial
   | RayTerm
 
 -- Photon shot from a light source
-data EmissivePhoton = EPhoton !Ray !ColorRGBf
+data EmissivePhoton = EPhoton !Ray !ColorRGBf deriving (Show)
 
 -- TODO: Is refraction a special case?
 data PhotonTransmitResult
@@ -70,13 +102,7 @@ data PhotonTransmitResult
   | PhotonStore Vec3d ColorRGBf
   | PhotonAbsorb
 
--- Maybe make "Applied Materials" an algebraic data type that supports
---  scattering matrials differently? (i.e. participating media / dieletric material)
--- The concept is it is an arbitrary material applied to the parameter
---  of a hit for a specific object.  This lets us avoid having
---  general-purpose "hit UV" properties and material mappings
 -- Note: all incoming directions must be "flipped"
--- TODO: investigate if it is possible to merge stochastic transmission functions
 data AppliedMaterial
   = AppliedMaterial
       { -- transmit a ray from a provided incoming direction; importance sampled.  Used in a path-tracing method
@@ -87,14 +113,24 @@ data AppliedMaterial
         surfaceBssrdf :: Bssrdf
       }
 
+-- Represents a participating media bounded by a volume
 data ParticipatingMaterial
   = ParticipatingMaterial
       { participateScatter :: Vec3d -> ColorRGBf,
         participateAbsorb :: Vec3d -> ColorRGBf,
         participatePhase :: PhaseFunc,
         -- Returns the importance-sampled out direction provided in an direction
-        -- participateImportance :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m Vec3d),
-        participateExit :: Ray -> Maybe Vec3d -- Returns the position that the Ray would exit the medium.  Due to advancing ray by small 'epsilon', it may not still be in the material
+        participateImportance :: (forall g m. (Monad m, RandomGen g) => Vec3d -> RandT g m Vec3d),
+        participateExit :: Ray -> Maybe Hit -- Returns the Hit that would exit the medium.  Due to advancing ray by small 'epsilon', it may not still be in the material
+      }
+
+-- A subsurface scattering material is just a participating material
+--  with refraction at the surface (plus optimizations)
+data ScatteringMaterial
+  = ScatteringMaterial
+      { scatteringParticipate :: ParticipatingMaterial,
+        -- Index of refraction
+        scatteringRefract :: Double
       }
 
 -- A function that maps a position in space with a power scale for lighting
@@ -120,21 +156,15 @@ data LightSource
           )
       }
 
--- We don't really want to define `Ord` over Hits
-closerHit :: Vec3d -> Maybe Hit -> Maybe Hit -> Maybe Hit
-closerHit p mh1 mh2 =
+closerHit :: Vec3d -> Hit -> Hit -> Bool
+closerHit p h1 h2 =
   let f x = mag $ (hitPos x) |-| p
-      c x y = (f x) < (f y)
-   in maybeCompare c mh1 mh2
+   in (f h1) < (f h2)
 
--- Where should this go?
-maybeCompare :: (a -> a -> Bool) -> Maybe a -> Maybe a -> Maybe a
-maybeCompare f m0 m1 =
-  case (m0, m1) of
-    (Nothing, Nothing) -> Nothing
-    (Nothing, Just v) -> Just v
-    (Just v, Nothing) -> Just v
-    (Just h0, Just h1) -> if f h0 h1 then Just h0 else Just h1
+-- We don't really want to define `Ord` over Hits
+closerHitM :: Vec3d -> Maybe Hit -> Maybe Hit -> Maybe Hit
+closerHitM p mh1 mh2 =
+  Misc.maybeCompare (closerHit p) mh1 mh2
 
 tmap0 :: (a -> b) -> (a, c) -> (b, c)
 tmap0 f (a, b) = (f a, b)

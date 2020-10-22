@@ -3,7 +3,7 @@ module OpalFalcon.XTracing.PathTracer (PathTracer (..), pathTraceScene) where
 import Control.Monad.Random
 import Debug.Trace
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray (Ray (..))
+import OpalFalcon.Math.Optics (Ray (..))
 import OpalFalcon.Math.Vector
 import OpalFalcon.Scene
 import OpalFalcon.Scene.Camera
@@ -34,9 +34,10 @@ pathTraceScene pt sc height cam =
       shootRay' ray@(Ray _ rDir) path =
         case probeCollection (sceneObjects sc) ray of
           Nothing -> return $ V3 0 1 0 -- Background color
-          Just MkHit {hitPos = pos, hitNorm = norm, hitMat = m, hitInc = (Ray _ hDir)} ->
+          Just (obj, h@(MkHit {hitPos = pos, hitNorm = norm, hitInc = (Ray _ hDir)})) ->
             let iDir = negateVec $ normalize hDir
                 pass oPos oDir refl = (refl |*|) <$> (shootRay (Ray (oPos |+| (ptEpsilon *| oDir)) oDir) (HSpec : path))
+                m = objHitMat obj h
              in do
                   rayResult <- transmitRay m iDir
                   case rayResult of

@@ -2,7 +2,7 @@ module OpalFalcon.XTracing.RayTraceUtils where
 
 import Data.Bits
 import OpalFalcon.BaseTypes
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Transformations
 import OpalFalcon.Math.Vector
 import OpalFalcon.Scene.Camera

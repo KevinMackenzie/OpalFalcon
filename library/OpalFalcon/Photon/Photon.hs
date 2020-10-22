@@ -160,6 +160,8 @@ packFlags Kd.YAxis = 2
 packFlags Kd.ZAxis = 3
 packFlags _ = error "Photon axis value violated"
 
+-- This packing strategy could much more uniformly represent
+--  possible directions (highly skewed in resolution near poles)
 {-# INLINE packDir #-}
 packDir :: Vec3d -> Word32
 packDir (V3 x y z) = 

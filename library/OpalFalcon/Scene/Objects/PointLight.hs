@@ -8,7 +8,7 @@ import Control.Monad.Random
 import GHC.Float (double2Float)
 import OpalFalcon.BaseTypes
 import OpalFalcon.Math.Lighting
-import OpalFalcon.Math.Ray
+import OpalFalcon.Math.Optics
 import OpalFalcon.Math.Vector
 import System.Random
 
